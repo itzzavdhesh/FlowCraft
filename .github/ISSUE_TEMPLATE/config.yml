@@ -1,0 +1,22 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: 📖 Read the Contributing Guide First
+    url: https://github.com/Tilakraj1491/FlowCraft/blob/main/CONTRIBUTING.md
+    about: >
+      Please read the Contributing Guide before opening any issue.
+      It explains how to use issue templates, how assignment works,
+      and what labels mean.
+
+  - name: 💬 Start a Discussion
+    url: https://github.com/Tilakraj1491/FlowCraft/discussions
+    about: >
+      Not sure if something is a bug or just want to share an idea?
+      Open a Discussion — it's a lower-friction way to get feedback
+      before filing a formal issue.
+
+  - name: 🔑 Get a Gemini API Key
+    url: https://aistudio.google.com/
+    about: >
+      FlowCraft uses the Gemini API for AI features.
+      Visit Google AI Studio to generate a free API key.

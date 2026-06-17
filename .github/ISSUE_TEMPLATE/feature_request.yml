@@ -1,0 +1,102 @@
+name: 🚀 Feature Request
+description: Suggest a new feature or enhancement for FlowCraft.
+title: "[FEATURE] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement! Great features start with clear problem statements.
+        Please check open issues before submitting to avoid duplicates.
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem Statement
+      description: |
+        What problem does this feature solve? Describe the gap or friction you are experiencing.
+        A clear problem statement helps maintainers evaluate priority and scope.
+      placeholder: |
+        As a user, I find it difficult to... because...
+        Currently there is no way to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: |
+        Describe the feature you would like to see added. Be as specific as possible —
+        include UI ideas, interaction patterns, or API shapes if relevant.
+      placeholder: |
+        I would like a button in the toolbar that allows...
+        The left sidebar could include a new section for...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature-area
+    attributes:
+      label: Feature Area
+      description: Which part of FlowCraft does this feature relate to?
+      options:
+        - Canvas (rendering, layout, pan/zoom)
+        - Block creation / form panel
+        - Block properties / right panel
+        - Export (PNG, PDF, PPTX)
+        - Save / Load workspace
+        - AI / Gemini integration
+        - Accessibility
+        - Performance
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternative-solutions
+    attributes:
+      label: Alternative Solutions Considered
+      description: |
+        Have you thought of other ways to solve the problem? Listing alternatives
+        shows you have thought through the design space and helps reviewers understand trade-offs.
+      placeholder: |
+        Alternative 1: ...
+        Alternative 2: ...
+        I ruled these out because...
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: |
+        Any other information, mockups, screenshots, links to similar tools, or references
+        that might help communicate your idea.
+      placeholder: e.g. Similar to how Figma handles... / Here is a rough sketch...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: willing-to-contribute
+    attributes:
+      label: Are You Willing to Implement This?
+      description: Let us know if you would like to open a pull request for this feature.
+      options:
+        - "Yes — I plan to open a PR"
+        - "Maybe — I would need guidance"
+        - "No — just suggesting"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues and this is not a duplicate.
+          required: true
+        - label: I have read the [Contributing Guide](../CONTRIBUTING.md).
+          required: true

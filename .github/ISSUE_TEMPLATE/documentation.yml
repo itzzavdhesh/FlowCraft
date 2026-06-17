@@ -1,0 +1,86 @@
+name: 📝 Documentation Improvement
+description: Report missing, incorrect, or unclear documentation in FlowCraft.
+title: "[DOCS] "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the FlowCraft documentation!
+        Good docs lower the barrier for new contributors and users. Every improvement matters.
+
+  - type: dropdown
+    id: doc-section
+    attributes:
+      label: Documentation Section Affected
+      description: Which part of the documentation needs improvement?
+      options:
+        - README.md — Project overview
+        - README.md — Setup / Run Locally instructions
+        - README.md — Available Scripts
+        - README.md — Tech Stack
+        - CONTRIBUTING.md — Coding conventions
+        - CONTRIBUTING.md — Program contributions
+        - CONTRIBUTING.md — Pull Request checklist
+        - CONTRIBUTING.md — Good First Issues
+        - In-code comments / JSDoc
+        - Missing documentation (no doc exists yet)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: doc-location
+    attributes:
+      label: Specific File or URL
+      description: If applicable, provide the file path or a link to the exact section that needs work.
+      placeholder: e.g. README.md#run-locally or src/utils/layout.ts line 120
+    validations:
+      required: false
+
+  - type: textarea
+    id: current-problem
+    attributes:
+      label: What Is Currently Wrong or Missing?
+      description: |
+        Describe the problem with the existing documentation.
+        Is something incorrect, incomplete, outdated, or confusing?
+      placeholder: |
+        The "Run Locally" section does not mention that a Gemini API key is needed before...
+        The layout.ts file has no comments explaining how the BFS placement works...
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested-improvement
+    attributes:
+      label: Suggested Improvement
+      description: |
+        What should the documentation say instead? You can paste a draft of the improved text here.
+        Even a rough draft is very helpful.
+      placeholder: |
+        The section should be updated to read:
+        "Before running the app, copy .env.example to .env.local and add your Gemini API key..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-notes
+    attributes:
+      label: Additional Notes (Optional)
+      description: Any other context, links to reference material, or reasons this documentation matters.
+      placeholder: e.g. I spent 2 hours debugging this because the docs didn't mention...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have checked that this is not already covered elsewhere in the docs.
+          required: true
+        - label: I have read the [Contributing Guide](../CONTRIBUTING.md).
+          required: true
+        - label: I am willing to open a pull request to fix this myself.
+          required: false
