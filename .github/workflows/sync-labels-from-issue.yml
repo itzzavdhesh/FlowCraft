@@ -1,0 +1,51 @@
+name: Sync Labels from Linked Issue
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  sync-issue-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy labels from linked issue to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const regex = /\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*:?\s*#(\d+)/gi;
+            const matches = [...body.matchAll(regex)];
+
+            if (matches.length === 0) return;
+
+            const issueNumbers = [...new Set(matches.map(m => parseInt(m[2], 10)))];
+            const labelsToApply = new Set();
+
+            for (const issueNumber of issueNumbers) {
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                });
+                // skip if the referenced number is actually a PR, not an issue
+                if (issue.pull_request) continue;
+
+                issue.labels.forEach(l => labelsToApply.add(typeof l === 'string' ? l : l.name));
+              } catch (e) {
+                // number didn't resolve to anything real, skip it
+              }
+            }
+
+            if (labelsToApply.size === 0) return;
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: [...labelsToApply],
+            });
