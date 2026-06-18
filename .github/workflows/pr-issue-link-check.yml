@@ -1,0 +1,57 @@
+name: PR Issue Link Check
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  check-issue-link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR references an issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const marker = '<!-- pr-issue-link-check -->';
+            const regex = /\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s*:?\s*#(\d+)/gi;
+            const matches = [...body.matchAll(regex)];
+            const hasLink = matches.length > 0;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+
+            let message;
+            if (hasLink) {
+              const issues = matches.map(m => `#${m[2]}`).join(', ');
+              message = `${marker}\n✅ Thanks! This PR is linked to ${issues} and will close it automatically when merged.`;
+            } else {
+              message = `${marker}\n⚠️ This PR doesn't seem to reference an issue yet. Please edit the description to add a line like:\n\n\`Closes #12\`\n\nThis links your work to the issue and auto-closes it once merged — it's also how ELUSOC tracks contributions.`;
+            }
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: message,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: message,
+              });
+            }
+
+            // Uncomment to make this a hard, blocking failure:
+            // if (!hasLink) core.setFailed('No linked issue found in PR description.');
