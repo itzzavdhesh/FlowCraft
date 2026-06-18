@@ -1,0 +1,144 @@
+name: Issue Template Validator
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+
+jobs:
+  validate-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check issue body is filled out
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const rawBody = context.payload.issue.body || '';
+            const marker = '<!-- template-validator -->';
+            const labelName = 'needs-more-info';
+
+            const issueLabels = context.payload.issue.labels.map(l => l.name);
+            let templateKey = null;
+            if (issueLabels.includes('bug')) templateKey = 'bug';
+            else if (issueLabels.includes('documentation')) templateKey = 'documentation';
+            else if (issueLabels.includes('enhancement')) templateKey = 'feature';
+
+            const REQUIRED_SECTIONS = {
+              bug: [
+                { match: 'describe the bug', minLength: 15 },
+                { match: 'steps to reproduce', minLength: 5, ignoreDefault: ['1.', '2.', '3.'] },
+                { match: 'expected behavior', minLength: 5 },
+                { match: 'actual behavior', minLength: 5 },
+              ],
+              documentation: [
+                { match: 'documentation area', requireChecked: true },
+                { match: 'current issue', minLength: 15 },
+                { match: 'suggested improvement', minLength: 10 },
+              ],
+              feature: [
+                { match: 'feature description', minLength: 10 },
+                { match: 'problem statement', minLength: 10, ignoreDefault: ['as a user, i find it difficult to...'] },
+                { match: 'proposed solution', minLength: 10 },
+              ],
+            };
+
+            function parseSections(body) {
+              const lines = body.split('\n');
+              const sections = [];
+              let current = null;
+              for (const line of lines) {
+                const headerMatch = line.match(/^##\s+(.*)$/);
+                if (headerMatch) {
+                  if (current) sections.push(current);
+                  current = { title: headerMatch[1].toLowerCase(), content: [] };
+                } else if (current) {
+                  current.content.push(line);
+                }
+              }
+              if (current) sections.push(current);
+              return sections.map(s => ({
+                title: s.title,
+                text: s.content.join('\n').replace(/<!--[\s\S]*?-->/g, '').replace(/^---$/gm, '').trim(),
+              }));
+            }
+
+            function stripDefaults(text, defaults) {
+              let out = text;
+              for (const d of defaults) out = out.split(d).join('');
+              return out;
+            }
+
+            const sections = parseSections(rawBody);
+            const issues = [];
+
+            if (/PROGRAM_NAME/.test(rawBody)) {
+              issues.push('the **Program** field still says `PROGRAM_NAME` — replace it with the program you\'re contributing through (e.g. ELUSOC)');
+            }
+
+            const requirements = REQUIRED_SECTIONS[templateKey] || [];
+            for (const req of requirements) {
+              const section = sections.find(s => s.title.includes(req.match));
+              if (!section) continue;
+
+              if (req.requireChecked) {
+                if (!/\[x\]/i.test(section.text)) {
+                  issues.push(`please tick at least one box under **${req.match}**`);
+                }
+                continue;
+              }
+
+              let text = section.text.toLowerCase();
+              if (req.ignoreDefault) text = stripDefaults(text, req.ignoreDefault);
+              text = text.trim();
+
+              if (text.length < req.minLength) {
+                issues.push(`the **${req.match}** section looks empty or unfinished`);
+              }
+            }
+
+            if (!templateKey) {
+              const stripped = rawBody.replace(/<!--[\s\S]*?-->/g, '').trim();
+              if (stripped.length < 30) {
+                issues.push('this issue appears to be empty — please add some details');
+              }
+            }
+
+            const invalid = issues.length > 0;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (invalid) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [labelName],
+              });
+
+              const list = issues.map(i => `- ${i}`).join('\n');
+              const message = `${marker}\n👋 Thanks for opening this! A few things need attention before this can be triaged:\n\n${list}\n\nI've added the \`${labelName}\` label — it'll be removed automatically once you update the issue.`;
+
+              if (existing) {
+                await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body: message });
+              } else {
+                await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body: message });
+              }
+            } else {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: labelName,
+                });
+              } catch (e) {
+                // label wasn't present
+              }
+            }

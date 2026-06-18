@@ -1,0 +1,21 @@
+name: Sync Labels
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/labels.yml'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Labeler
+        uses: crazy-max/ghaction-github-labeler@v5
+        with:
+          skip-delete: false
