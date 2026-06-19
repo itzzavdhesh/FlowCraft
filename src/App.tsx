@@ -226,6 +226,12 @@ export default function App() {
     showToast('Flowchart cleared. Canvas is ready!', 'info');
   };
 
+  const handleGenerateBlocks = (generatedBlocks: Block[]) => {
+    setBlocks(generatedBlocks);
+    setSelectedBlockId(generatedBlocks[0]?.id ?? null);
+    setActiveParentId(null);
+  };
+
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null;
 
   return (
@@ -239,6 +245,8 @@ export default function App() {
         onDeleteBlock={handleDeleteBlock}
         activeParentId={activeParentId}
         onCancelActiveParent={() => setActiveParentId(null)}
+        onGenerateBlocks={handleGenerateBlocks}
+        showToast={showToast}
       />
 
       {/* CENTER GRID CANVAS ZONE */}
