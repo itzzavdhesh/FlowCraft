@@ -6,8 +6,12 @@
 import React, { useState } from 'react';
 import { Zap, Edit2, Trash2, Plus, X } from 'lucide-react';
 import { ShapeType, Block } from '../types';
+import { Sparkles, Loader2 } from 'lucide-react';
+import { generateFlowchart } from '../utils/gemini';
 
 interface LeftSidebarProps {
+  onGenerateBlocks: (blocks: Block[]) => void;
+  showToast: (message: string, type?: 'success' | 'info' | 'error') => void;
   blocks: Block[];
   selectedBlockId: string | null;
   onSelectBlock: (id: string) => void;
@@ -15,6 +19,7 @@ interface LeftSidebarProps {
   onDeleteBlock: (id: string) => void;
   activeParentId: string | null;
   onCancelActiveParent: () => void;
+  
 }
 
 export default function LeftSidebar({
@@ -25,6 +30,8 @@ export default function LeftSidebar({
   onDeleteBlock,
   activeParentId,
   onCancelActiveParent,
+  onGenerateBlocks,
+  showToast,
 }: LeftSidebarProps) {
   const [selectedType, setSelectedType] = useState<ShapeType>('terminator');
   const [blockLabel, setBlockLabel] = useState('');
@@ -32,6 +39,23 @@ export default function LeftSidebar({
   // Decision specific branch labels
   const [yesLabel, setYesLabel] = useState('Yes');
   const [noLabel, setNoLabel] = useState('No');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const handleAiGenerate = async () => {
+    if (!aiPrompt.trim() || aiLoading) return;
+    setAiLoading(true);
+    try {
+      const blocks = await generateFlowchart(aiPrompt.trim());
+      onGenerateBlocks(blocks);
+      setAiPrompt('');
+      showToast(`Generated ${blocks.length} blocks from AI!`, 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'AI generation failed.', 'error');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const activeParentBlock = blocks.find((b) => b.id === activeParentId);
 
@@ -135,6 +159,40 @@ export default function LeftSidebar({
             </button>
           </div>
         )}
+
+        {/* AI Generate Section */}
+        <div className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            Generate with AI
+          </h2>
+          <textarea
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            placeholder="Describe your flow… e.g. &quot;User login with password reset fallback&quot;"
+            rows={3}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans bg-gray-50/50 hover:bg-gray-50/20 focus:bg-white placeholder:text-gray-400 resize-none"
+          />
+          <button
+            type="button"
+            onClick={handleAiGenerate}
+            disabled={!aiPrompt.trim() || aiLoading}
+            className="w-full py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-xs rounded-lg transition-colors shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            {aiLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Generate Flowchart
+              </>
+            )}
+          </button>
+        </div>
+        <div className="border-t border-gray-100" />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
