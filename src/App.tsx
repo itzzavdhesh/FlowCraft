@@ -219,6 +219,17 @@ export default function App() {
     }, 1200);
   };
 
+  const handleImportWorkspace = (importedBlocks: Block[]) => {
+    if (Array.isArray(importedBlocks) && importedBlocks.length > 0) {
+      setBlocks(importedBlocks);
+      setSelectedBlockId(importedBlocks[0].id);
+      setActiveParentId(null);
+      showToast('Workspace imported successfully!', 'success');
+    } else {
+      showToast('Invalid workspace file format.', 'error');
+    }
+  };
+
   const handleNewFlowchart = () => {
     setBlocks([]);
     setSelectedBlockId(null);
@@ -249,6 +260,7 @@ export default function App() {
         onSave={handleSaveWorkspace}
         onLoad={handleLoadWorkspace}
         onExport={handleExportFile}
+        onImportWorkspace={handleImportWorkspace}
         onNewFlowchart={handleNewFlowchart}
         onAddFirstBlock={() => {
           setBlocks(initialDemoBlocks);
