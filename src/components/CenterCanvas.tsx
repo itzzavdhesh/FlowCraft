@@ -99,6 +99,45 @@ export default function CenterCanvas({
     setIsPanning(false);
   };
 
+  const handleFitToScreen = () => {
+    if (nodes.length === 0 || !containerRef.current) return;
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    nodes.forEach((node) => {
+      minX = Math.min(minX, node.x);
+      maxX = Math.max(maxX, node.x + NODE_WIDTH);
+      minY = Math.min(minY, node.y);
+      maxY = Math.max(maxY, node.y + NODE_HEIGHT);
+    });
+
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+
+    const containerWidth = containerRef.current.clientWidth;
+    const containerHeight = containerRef.current.clientHeight;
+
+    const padding = 80;
+    const scaleX = (containerWidth - padding) / contentWidth;
+    const scaleY = (containerHeight - padding) / contentHeight;
+    let newScale = Math.min(scaleX, scaleY);
+    newScale = Math.min(Math.max(0.4, newScale), 2);
+    newScale = parseFloat(newScale.toFixed(2));
+
+    const contentCx = minX + contentWidth / 2;
+    const contentCy = minY + contentHeight / 2;
+
+    const newPanX = containerWidth / 2 - contentCx * newScale;
+    const newPanY = containerHeight / 2 - contentCy * newScale;
+
+    setScale(newScale);
+    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
+    showToast?.('Fit flowchart to screen', 'info');
+  };
+
   // Wheel zoom listener with passive ref to prevent page scroll
   React.useEffect(() => {
     const container = containerRef.current;
@@ -747,6 +786,13 @@ export default function CenterCanvas({
                 className="px-2.5 py-1.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-100 hover:border-indigo-200 rounded-lg transition-colors cursor-pointer"
               >
                 Reset
+              </button>
+              <button
+                onClick={handleFitToScreen}
+                title="Fit all blocks to viewport"
+                className="px-2.5 py-1.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-100 hover:border-indigo-200 rounded-lg transition-colors cursor-pointer"
+              >
+                Fit
               </button>
             </div>
           </>
