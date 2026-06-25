@@ -4,8 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { Zap, Edit2, Trash2, Plus, X } from 'lucide-react';
+import { Zap, Edit2, Trash2, Plus, X, Sparkles } from 'lucide-react';
 import { ShapeType, Block } from '../types';
+import { GoogleGenAI } from '@google/genai';
 
 interface LeftSidebarProps {
   blocks: Block[];
@@ -15,6 +16,7 @@ interface LeftSidebarProps {
   onDeleteBlock: (id: string) => void;
   activeParentId: string | null;
   onCancelActiveParent: () => void;
+  onSetBlocks: (blocks: Block[]) => void;
 }
 
 export default function LeftSidebar({
@@ -25,6 +27,7 @@ export default function LeftSidebar({
   onDeleteBlock,
   activeParentId,
   onCancelActiveParent,
+  onSetBlocks,
 }: LeftSidebarProps) {
   const [selectedType, setSelectedType] = useState<ShapeType>('terminator');
   const [blockLabel, setBlockLabel] = useState('');
@@ -32,6 +35,75 @@ export default function LeftSidebar({
   // Decision specific branch labels
   const [yesLabel, setYesLabel] = useState('Yes');
   const [noLabel, setNoLabel] = useState('No');
+
+  // AI Generator state
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [apiKey, setApiKey] = useState(() => {
+    return ((import.meta as any).env?.VITE_GEMINI_API_KEY as string) || localStorage.getItem('flowcraft_gemini_api_key') || '';
+  });
+
+  const handleAIGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiPrompt.trim()) return;
+    const finalApiKey = apiKey || ((import.meta as any).env?.VITE_GEMINI_API_KEY as string) || '';
+    if (!finalApiKey) {
+      alert('Please provide a Google Gemini API Key. You can get one from Google AI Studio.');
+      setShowApiKeyInput(true);
+      return;
+    }
+
+    setAiLoading(true);
+    try {
+      if (apiKey) {
+        localStorage.setItem('flowcraft_gemini_api_key', apiKey);
+      }
+
+      const ai = new GoogleGenAI({ apiKey: finalApiKey });
+      const systemInstruction = `You are a flowchart assistant. Convert the user's description into a structured flowchart.
+Output MUST be a raw JSON array of Block objects. Do not wrap in markdown \`\`\`json blocks.
+Block structure is:
+interface Block {
+  id: string; // Unique string identifier
+  type: 'terminator' | 'process' | 'decision' | 'io';
+  label: string; // Short label
+  targetId?: string; // Point to the next block id (for terminator, process, io)
+  yesLabel?: string; // For decision nodes
+  noLabel?: string; // For decision nodes
+  yesTargetId?: string; // Target block id for Yes branch (for decision)
+  noTargetId?: string; // Target block id for No branch (for decision)
+}
+Guidelines:
+- Start with a terminator node (e.g. 'Start').
+- Connect nodes sequentially using targetId, yesTargetId, and noTargetId.
+- End with a terminator node (e.g. 'End').`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `Process description: ${aiPrompt}`,
+        config: {
+          systemInstruction,
+          responseMimeType: 'application/json',
+        }
+      });
+
+      const text = response.text;
+      if (!text) throw new Error('Empty response from Gemini');
+      const parsed = JSON.parse(text) as Block[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        onSetBlocks(parsed);
+        setAiPrompt('');
+      } else {
+        alert('Gemini generated an invalid layout. Please try again.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`AI Generation failed: ${err.message || err}`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const activeParentBlock = blocks.find((b) => b.id === activeParentId);
 
@@ -217,6 +289,71 @@ export default function LeftSidebar({
             </button>
           </div>
         </form>
+
+        {/* Gemini AI Flow Generator Section */}
+        <div className="border-t border-gray-100 pt-5">
+          <h2 id="ai-generator-section-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-500 fill-indigo-100" />
+            AI Flowcraft Generator
+          </h2>
+          <form onSubmit={handleAIGenerate} className="space-y-3">
+            <div>
+              <label htmlFor="ai-prompt-input" className="block text-xs font-bold text-gray-700 mb-1.5">Describe your Flow</label>
+              <textarea
+                id="ai-prompt-input"
+                rows={3}
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="e.g. User login with validation, database check, and redirect..."
+                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans bg-gray-50/50 hover:bg-gray-50/20 focus:bg-white resize-none"
+              />
+            </div>
+
+            {/* Toggle / input for API key if needed */}
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+                className="text-[10px] text-indigo-600 hover:text-indigo-850 font-bold hover:underline cursor-pointer"
+              >
+                {showApiKeyInput ? 'Hide API Key field' : 'Set Gemini API Key'}
+              </button>
+            </div>
+
+            {showApiKeyInput && (
+              <div className="bg-gray-50/50 border border-gray-150 p-2.5 rounded-lg">
+                <label htmlFor="ai-api-key-input" className="block text-[10px] font-bold text-gray-600 mb-1">Gemini API Key</label>
+                <input
+                  id="ai-api-key-input"
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Paste AI Studio Key..."
+                  className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:border-indigo-500 bg-white"
+                />
+              </div>
+            )}
+
+            <button
+              id="ai-generate-submit"
+              type="submit"
+              disabled={aiLoading || !aiPrompt.trim()}
+              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-xs rounded-lg transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              {aiLoading ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Generate with AI
+                </>
+              )}
+            </button>
+          </form>
+        </div>
 
         <div className="border-t border-gray-100 pt-5">
           <h2 id="left-sidebar-list-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 block">Blocks</h2>
