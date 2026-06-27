@@ -17,7 +17,8 @@ import {
   Database,
   ZoomIn,
   ZoomOut,
-  FilePlus
+  FilePlus,
+  Upload
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -32,6 +33,7 @@ interface CenterCanvasProps {
   onSave: () => void;
   onLoad: () => void;
   onExport: (format: 'png' | 'pdf' | 'pptx') => void;
+  onImportWorkspace: (importedBlocks: Block[]) => void;
   onNewFlowchart: () => void;
   onAddFirstBlock: () => void;
   showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
@@ -44,6 +46,7 @@ export default function CenterCanvas({
   onSave,
   onLoad,
   onExport,
+  onImportWorkspace,
   onNewFlowchart,
   onAddFirstBlock,
   showToast,
@@ -61,6 +64,35 @@ export default function CenterCanvas({
   const [isPanning, setIsPanning] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const panStart = useRef({ x: 0, y: 0 });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileImportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+        
+        let blocksToImport: Block[] = [];
+        if (Array.isArray(parsed)) {
+          blocksToImport = parsed;
+        } else if (parsed && Array.isArray(parsed.blueprint)) {
+          blocksToImport = parsed.blueprint;
+        } else {
+          throw new Error("Invalid structure");
+        }
+
+        onImportWorkspace(blocksToImport);
+      } catch (err) {
+        showToast?.('Error parsing file: ' + err, 'error');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   // Mouse pan event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -340,6 +372,13 @@ export default function CenterCanvas({
 
   return (
     <div className="flex-grow h-full flex flex-col min-w-0 bg-[#fbfbfc]">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileImportChange}
+        accept=".json, .txt"
+        className="hidden"
+      />
       {/* Top Toolbar */}
       <header className="h-[64px] bg-white border-b border-gray-100 shadow-xs px-6 flex items-center justify-between shrink-0 select-none z-10">
         <div className="flex items-center gap-2">
@@ -370,6 +409,16 @@ export default function CenterCanvas({
           >
             <FolderOpen className="w-3.5 h-3.5" />
             Load
+          </button>
+
+          <button
+            id="toolbar-btn-import"
+            onClick={() => fileInputRef.current?.click()}
+            title="Import flowchart blueprint from JSON file"
+            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Import
           </button>
 
           <button
