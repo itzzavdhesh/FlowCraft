@@ -17,9 +17,10 @@ import {
   Database,
   ZoomIn,
   ZoomOut,
-  FilePlus
+  FilePlus,
+  FileCode
 } from 'lucide-react';
-import { toPng } from 'html-to-image';
+import { toPng, toSvg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import pptxgen from 'pptxgenjs';
 import { Block, CanvasNode } from '../types';
@@ -152,6 +153,28 @@ export default function CenterCanvas({
     } catch (error) {
       console.error('Error generating PNG:', error);
       showToast?.('Failed to capture PNG.', 'error');
+    }
+  };
+
+  const handleExportSVG = async () => {
+    if (!canvasRef.current) return;
+    try {
+      showToast?.('Generating SVG...', 'info');
+      const dataUrl = await toSvg(canvasRef.current, {
+        backgroundColor: '#f8f9fa',
+        style: {
+          transform: 'translate(0px, 0px) scale(1)',
+        },
+        cacheBust: true,
+      });
+      const link = document.createElement('a');
+      link.download = 'flowforge-chart.svg';
+      link.href = dataUrl;
+      link.click();
+      showToast?.('Flowchart saved as SVG!', 'success');
+    } catch (error) {
+      console.error('Error generating SVG:', error);
+      showToast?.('Failed to capture SVG.', 'error');
     }
   };
 
@@ -391,6 +414,15 @@ export default function CenterCanvas({
           >
             <FileImage className="w-3.5 h-3.5" />
             Export PNG
+          </button>
+
+          <button
+            id="toolbar-btn-export-svg"
+            onClick={handleExportSVG}
+            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <FileCode className="w-3.5 h-3.5" />
+            Export SVG
           </button>
 
           <button
