@@ -62,6 +62,33 @@ export default function CenterCanvas({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const panStart = useRef({ x: 0, y: 0 });
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const panStep = 30;
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setPan(prev => ({ ...prev, y: prev.y + panStep }));
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setPan(prev => ({ ...prev, y: prev.y - panStep }));
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setPan(prev => ({ ...prev, x: prev.x + panStep }));
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setPan(prev => ({ ...prev, x: prev.x - panStep }));
+    } else if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      setScale(prev => Math.min(3, parseFloat((prev + 0.1).toFixed(2))));
+    } else if (e.key === '-') {
+      e.preventDefault();
+      setScale(prev => Math.max(0.25, parseFloat((prev - 0.1).toFixed(2))));
+    } else if (e.key === '0') {
+      e.preventDefault();
+      setScale(1);
+      setPan({ x: 0, y: 0 });
+    }
+  };
+
   // Mouse pan event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     // Only drag with left mouse button click
@@ -318,7 +345,7 @@ export default function CenterCanvas({
   };
 
   const getShapeStyle = (type: string, isSelected: boolean) => {
-    const baseClass = "absolute transition-all duration-250 cursor-pointer flex items-center justify-center border-2 shadow-md ";
+    const baseClass = "absolute transition-all duration-250 cursor-pointer flex items-center justify-center border-2 shadow-md focus:outline-none focus:ring-4 focus:ring-indigo-300 focus:ring-offset-1 ";
     const selectedClass = isSelected 
       ? "border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 shadow-lg scale-102"
       : "border-indigo-500 hover:border-indigo-650 hover:shadow-lg hover:scale-101";
@@ -422,7 +449,10 @@ export default function CenterCanvas({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        className={`flex-grow relative overflow-hidden bg-[#f8f9fa] select-none ${
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        aria-label="Flowchart interactive canvas. Use arrow keys to pan, plus/minus keys to zoom, and zero key to reset."
+        className={`flex-grow relative overflow-hidden bg-[#f8f9fa] select-none focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
           isPanning ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
@@ -614,13 +644,22 @@ export default function CenterCanvas({
                       key={node.block.id}
                       id={`flow-node-${node.block.id}`}
                       onClick={() => onSelectBlock(node.block.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onSelectBlock(node.block.id);
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`Decision node: ${node.block.label}`}
                       style={{
                         left: `${node.x}px`,
                         top: `${node.y}px`,
                         width: `${NODE_WIDTH}px`,
                         height: `${NODE_HEIGHT}px`,
                       }}
-                      className="absolute group cursor-pointer origin-center"
+                      className="absolute group cursor-pointer origin-center focus:outline-none"
                     >
                       {/* Diamond visually rotated 45 degrees, sized as a neat background */}
                       <div 
@@ -633,7 +672,7 @@ export default function CenterCanvas({
                         className={`absolute border-2 shadow-md transition-all duration-200 bg-white rotate-45 ${
                           isSelected 
                             ? 'border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 scale-102' 
-                            : 'border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg'
+                            : 'border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg group-focus:border-indigo-600 group-focus:ring-4 group-focus:ring-indigo-100'
                         }`}
                       />
                       {/* Text wrapper kept upright at the same coordinates, centered perfectly */}
@@ -660,20 +699,29 @@ export default function CenterCanvas({
                       key={node.block.id}
                       id={`flow-node-${node.block.id}`}
                       onClick={() => onSelectBlock(node.block.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onSelectBlock(node.block.id);
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`Input Output node: ${node.block.label}`}
                       style={{
                         left: `${node.x}px`,
                         top: `${node.y}px`,
                         width: `${NODE_WIDTH}px`,
                         height: `${NODE_HEIGHT}px`,
                       }}
-                      className="absolute group cursor-pointer origin-center"
+                      className="absolute group cursor-pointer origin-center focus:outline-none"
                     >
                       {/* Parallelogram Shape */}
                       <div 
                         className={`absolute inset-0 transition-all duration-250 bg-white border-2 rounded-md shadow-md ${
                           isSelected 
                             ? 'border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 scale-102' 
-                            : 'border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg'
+                            : 'border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg group-focus:border-indigo-600 group-focus:ring-4 group-focus:ring-indigo-100'
                         }`}
                         style={{
                           transform: 'skewX(-15deg)',
@@ -698,6 +746,15 @@ export default function CenterCanvas({
                     key={node.block.id}
                     id={`flow-node-${node.block.id}`}
                     onClick={() => onSelectBlock(node.block.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onSelectBlock(node.block.id);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Flowchart node: ${node.block.label}, Type: ${node.block.type}`}
                     style={{
                       left: `${node.x}px`,
                       top: `${node.y}px`,
