@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
-// Assuming the Vite server is on 3000 and the WS server is on 3001
-const SOCKET_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+// Target the WS server which runs on port 3001 during dev
+const SOCKET_URL = window.location.port === '3000' || import.meta.env.DEV
   ? `http://${window.location.hostname}:3001` 
   : window.location.origin;
 
