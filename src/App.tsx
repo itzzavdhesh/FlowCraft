@@ -52,6 +52,10 @@ const initialDemoBlocks: Block[] = [
   },
 ];
 
+const isValidWorkspaceBlocks = (blocks: any): blocks is Block[] => {
+  return Array.isArray(blocks) && blocks.every(b => b && typeof b === 'object' && typeof b.id === 'string' && ['terminator', 'process', 'decision', 'io'].includes(b.type));
+};
+
 export default function App() {
   const [blocks, setBlocks] = useState<Block[]>(initialDemoBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>('demo-1');
@@ -70,16 +74,21 @@ export default function App() {
         if (wsNames.length > 0) {
           setWorkspaces(wsNames);
           setCurrentWorkspace(wsNames[0]);
-          setBlocks(parsed[wsNames[0]]);
+          if (isValidWorkspaceBlocks(parsed[wsNames[0]])) {
+            setBlocks(parsed[wsNames[0]]);
+          } else {
+            setBlocks(initialDemoBlocks);
+          }
         }
       } else {
         // Migration from old version
         const oldData = localStorage.getItem('flowforge_save');
         if (oldData) {
           const parsed = JSON.parse(oldData);
-          localStorage.setItem('flowforge_workspaces', JSON.stringify({ 'Form-Flow Sandbox': parsed }));
+          const validBlocks = isValidWorkspaceBlocks(parsed) ? parsed : initialDemoBlocks;
+          localStorage.setItem('flowforge_workspaces', JSON.stringify({ 'Form-Flow Sandbox': validBlocks }));
           setWorkspaces(['Form-Flow Sandbox']);
-          setBlocks(parsed);
+          setBlocks(validBlocks);
         }
       }
     } catch {}
@@ -212,6 +221,10 @@ export default function App() {
       if (data) {
         const parsed = JSON.parse(data);
         if (parsed[name]) {
+          if (!isValidWorkspaceBlocks(parsed[name])) {
+            showToast(`Workspace "${name}" is corrupted.`, 'error');
+            return;
+          }
           setBlocks(parsed[name]);
           setCurrentWorkspace(name);
           setSelectedBlockId(null);
@@ -276,24 +289,21 @@ export default function App() {
       try {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content) as Block[];
-        const isValid = Array.isArray(parsed) && parsed.every(b => b && typeof b === 'object' && typeof b.id === 'string' && ['terminator', 'process', 'decision', 'io'].includes(b.type));
         
-        if (isValid) {
+        if (isValidWorkspaceBlocks(parsed)) {
             setBlocks(parsed);
             setSelectedBlockId(null);
             setActiveParentId(null);
             
-            let newName = file.name.replace('.json', '');
+            let baseName = file.name.replace('.json', '');
+            let newName = baseName;
             
             const data = localStorage.getItem('flowforge_workspaces');
             const parsedStorage = data ? JSON.parse(data) : {};
             const currentKeys = Object.keys(parsedStorage);
             
-            if (currentKeys.includes(newName)) {
-                newName = `${newName}-${Math.random().toString(36).substring(2, 6)}`;
-            }
-            if (newName === '__proto__' || newName === 'constructor' || newName === 'prototype') {
-                newName = `Workspace-${Math.random().toString(36).substring(2, 6)}`;
+            while (currentKeys.includes(newName) || newName === '__proto__' || newName === 'constructor' || newName === 'prototype') {
+                newName = `${baseName}-${Math.random().toString(36).substring(2, 6)}`;
             }
             
             parsedStorage[newName] = parsed;
