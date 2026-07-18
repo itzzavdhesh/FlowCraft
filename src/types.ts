@@ -4,6 +4,7 @@
  */
 
 export type ShapeType = 'terminator' | 'process' | 'decision' | 'io';
+export type LayoutDirection = 'vertical' | 'horizontal';
 
 export interface Block {
   id: string;

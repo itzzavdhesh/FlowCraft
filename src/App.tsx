@@ -8,7 +8,7 @@ import LeftSidebar from './components/LeftSidebar';
 import CenterCanvas from './components/CenterCanvas';
 import RightSidebar from './components/RightSidebar';
 import Toast from './components/Toast';
-import { Block, ToastConfig } from './types';
+import { Block, ToastConfig, LayoutDirection } from './types';
 
 // Default blueprint layout tracking
 const initialDemoBlocks: Block[] = [
@@ -57,6 +57,7 @@ export default function App() {
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>('demo-1');
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastConfig[]>([]);
+  const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('vertical');
 
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -256,6 +257,8 @@ export default function App() {
           showToast('Loaded vertical flow template!');
         }}
         showToast={showToast}
+        layoutDirection={layoutDirection}
+        onLayoutDirectionChange={setLayoutDirection}
       />
 
       {/* RIGHT SIDEBAR PROPERTIES */}

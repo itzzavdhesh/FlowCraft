@@ -22,7 +22,7 @@ import {
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import pptxgen from 'pptxgenjs';
-import { Block, CanvasNode } from '../types';
+import { Block, CanvasNode, LayoutDirection } from '../types';
 import { calculateLayout, calculateConnections, NODE_WIDTH, NODE_HEIGHT, DIAMOND_SIZE } from '../utils/layout';
 
 interface CenterCanvasProps {
@@ -35,6 +35,8 @@ interface CenterCanvasProps {
   onNewFlowchart: () => void;
   onAddFirstBlock: () => void;
   showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
+  layoutDirection: LayoutDirection;
+  onLayoutDirectionChange: (direction: LayoutDirection) => void;
 }
 
 export default function CenterCanvas({
@@ -47,13 +49,15 @@ export default function CenterCanvas({
   onNewFlowchart,
   onAddFirstBlock,
   showToast,
+  layoutDirection,
+  onLayoutDirectionChange,
 }: CenterCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Apply layout algorithm
-  const nodes = calculateLayout(blocks);
-  const connections = calculateConnections(nodes);
+  const nodes = calculateLayout(blocks, layoutDirection);
+  const connections = calculateConnections(nodes, layoutDirection);
 
   // Zoom & Pan states
   const [scale, setScale] = useState(1);
@@ -370,6 +374,14 @@ export default function CenterCanvas({
           >
             <FolderOpen className="w-3.5 h-3.5" />
             Load
+          </button>
+
+          <button
+            onClick={() => onLayoutDirectionChange(layoutDirection === 'vertical' ? 'horizontal' : 'vertical')}
+            title="Toggle layout direction"
+            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            {layoutDirection === 'vertical' ? '↕ Vertical' : '↔ Horizontal'}
           </button>
 
           <button
