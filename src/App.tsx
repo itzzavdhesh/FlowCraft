@@ -58,6 +58,31 @@ export default function App() {
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastConfig[]>([]);
   const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('vertical');
+  const [currentWorkspace, setCurrentWorkspace] = useState<string>('Form-Flow Sandbox');
+  const [workspaces, setWorkspaces] = useState<string[]>(['Form-Flow Sandbox']);
+
+  useEffect(() => {
+    try {
+      const data = localStorage.getItem('flowforge_workspaces');
+      if (data) {
+        const parsed = JSON.parse(data);
+        const wsNames = Object.keys(parsed);
+        if (wsNames.length > 0) {
+          setWorkspaces(wsNames);
+          // Only load the first one if we want, but let's keep current blocks until load is explicitly called
+          // Or we can just populate the workspaces list.
+        }
+      } else {
+        // Migration from old version
+        const oldData = localStorage.getItem('flowforge_save');
+        if (oldData) {
+          const parsed = JSON.parse(oldData);
+          localStorage.setItem('flowforge_workspaces', JSON.stringify({ 'Form-Flow Sandbox': parsed }));
+          setWorkspaces(['Form-Flow Sandbox']);
+        }
+      }
+    } catch {}
+  }, []);
 
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -160,34 +185,118 @@ export default function App() {
   };
 
   // Persistent Local Storage hooks
-  const handleSaveWorkspace = () => {
+  const handleSaveWorkspace = (name: string) => {
     try {
-      localStorage.setItem('flowforge_save', JSON.stringify(blocks));
-      showToast('Flowchart saved!', 'success');
+      const data = localStorage.getItem('flowforge_workspaces');
+      const parsed = data ? JSON.parse(data) : {};
+      parsed[name] = blocks;
+      localStorage.setItem('flowforge_workspaces', JSON.stringify(parsed));
+      if (!workspaces.includes(name)) {
+        setWorkspaces([...workspaces, name]);
+      }
+      setCurrentWorkspace(name);
+      showToast(`Workspace "${name}" saved!`, 'success');
     } catch {
-      showToast('Could not save flowchart', 'error');
+      showToast('Could not save workspace', 'error');
     }
   };
 
-  const handleLoadWorkspace = () => {
+  const handleLoadWorkspace = (name: string) => {
     try {
-      const data = localStorage.getItem('flowforge_save');
+      const data = localStorage.getItem('flowforge_workspaces');
       if (data) {
-        const parsed = JSON.parse(data) as Block[];
-        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          setBlocks(parsed);
-          setSelectedBlockId(parsed[0].id);
+        const parsed = JSON.parse(data);
+        if (parsed[name]) {
+          setBlocks(parsed[name]);
+          setCurrentWorkspace(name);
+          setSelectedBlockId(null);
           setActiveParentId(null);
-          showToast('Flowchart loaded!', 'success');
+          showToast(`Workspace "${name}" loaded!`, 'success');
         } else {
-          showToast('No saved flowchart found.', 'error');
+          showToast(`Workspace "${name}" not found.`, 'error');
         }
       } else {
-        showToast('No saved flowchart found.', 'info');
+        showToast('No saved workspaces found.', 'info');
       }
     } catch {
-      showToast('No saved flowchart found.', 'error');
+      showToast('Could not load workspace.', 'error');
     }
+  };
+
+  const handleDeleteWorkspace = (name: string) => {
+    try {
+      const data = localStorage.getItem('flowforge_workspaces');
+      if (data) {
+        const parsed = JSON.parse(data);
+        delete parsed[name];
+        localStorage.setItem('flowforge_workspaces', JSON.stringify(parsed));
+        
+        const updatedWorkspaces = workspaces.filter(w => w !== name);
+        setWorkspaces(updatedWorkspaces);
+        
+        if (currentWorkspace === name) {
+          if (updatedWorkspaces.length > 0) {
+             handleLoadWorkspace(updatedWorkspaces[0]);
+          } else {
+             handleNewFlowchart();
+          }
+        }
+        showToast(`Workspace "${name}" deleted!`, 'info');
+      }
+    } catch {
+      showToast('Could not delete workspace', 'error');
+    }
+  };
+
+  const handleExportJSON = () => {
+    try {
+      const fileContent = JSON.stringify(blocks, null, 2);
+      const blob = new Blob([fileContent], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${currentWorkspace}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast(`Workspace exported as JSON!`, 'success');
+    } catch {
+      showToast('Failed to export JSON', 'error');
+    }
+  };
+
+  const handleImportJSON = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content) as Block[];
+        if (Array.isArray(parsed)) {
+            setBlocks(parsed);
+            let newName = file.name.replace('.json', '');
+            
+            if (workspaces.includes(newName)) {
+                newName = `${newName}-${Math.random().toString(36).substring(2, 6)}`;
+            }
+            
+            const data = localStorage.getItem('flowforge_workspaces');
+            const parsedStorage = data ? JSON.parse(data) : {};
+            parsedStorage[newName] = parsed;
+            localStorage.setItem('flowforge_workspaces', JSON.stringify(parsedStorage));
+            
+            setWorkspaces(prev => [...prev, newName]);
+            setCurrentWorkspace(newName);
+            
+            showToast(`Imported "${newName}" successfully!`, 'success');
+        } else {
+            showToast('Invalid workspace file', 'error');
+        }
+      } catch {
+        showToast('Failed to parse JSON', 'error');
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Triggers interactive downloadable schematic files to fulfill "Real code integrations" guidelines
@@ -249,8 +358,13 @@ export default function App() {
         onSelectBlock={setSelectedBlockId}
         onSave={handleSaveWorkspace}
         onLoad={handleLoadWorkspace}
+        onDeleteWorkspace={handleDeleteWorkspace}
         onExport={handleExportFile}
+        onExportJSON={handleExportJSON}
+        onImportJSON={handleImportJSON}
         onNewFlowchart={handleNewFlowchart}
+        workspaces={workspaces}
+        currentWorkspace={currentWorkspace}
         onAddFirstBlock={() => {
           setBlocks(initialDemoBlocks);
           setSelectedBlockId('demo-1');
