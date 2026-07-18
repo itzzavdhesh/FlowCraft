@@ -372,8 +372,15 @@ export default function CenterCanvas({
           </select>
           <span className="px-1.5 py-0.5 bg-indigo-50 text-[10px] text-indigo-600 rounded-md font-semibold font-mono">STABLE</span>
           <button onClick={() => {
-            const name = prompt('Save workspace as (enter new name):', currentWorkspace + ' Copy');
-            if (name) onSave(name);
+            let name = prompt('Save workspace as (enter new name):', currentWorkspace + ' Copy');
+            if (name) {
+              name = name.trim();
+              if (name === '') return;
+              if (workspaces.includes(name) && name !== currentWorkspace) {
+                if (!confirm(`Workspace "${name}" already exists. Overwrite?`)) return;
+              }
+              onSave(name);
+            }
           }} title="Save As" className="text-gray-400 hover:text-indigo-600 cursor-pointer ml-1 p-1">
              <Save className="w-3.5 h-3.5" />
           </button>

@@ -69,8 +69,8 @@ export default function App() {
         const wsNames = Object.keys(parsed);
         if (wsNames.length > 0) {
           setWorkspaces(wsNames);
-          // Only load the first one if we want, but let's keep current blocks until load is explicitly called
-          // Or we can just populate the workspaces list.
+          setCurrentWorkspace(wsNames[0]);
+          setBlocks(parsed[wsNames[0]]);
         }
       } else {
         // Migration from old version
@@ -79,6 +79,7 @@ export default function App() {
           const parsed = JSON.parse(oldData);
           localStorage.setItem('flowforge_workspaces', JSON.stringify({ 'Form-Flow Sandbox': parsed }));
           setWorkspaces(['Form-Flow Sandbox']);
+          setBlocks(parsed);
         }
       }
     } catch {}
@@ -186,6 +187,10 @@ export default function App() {
 
   // Persistent Local Storage hooks
   const handleSaveWorkspace = (name: string) => {
+    if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+      showToast('Invalid workspace name', 'error');
+      return;
+    }
     try {
       const data = localStorage.getItem('flowforge_workspaces');
       const parsed = data ? JSON.parse(data) : {};
@@ -226,23 +231,22 @@ export default function App() {
   const handleDeleteWorkspace = (name: string) => {
     try {
       const data = localStorage.getItem('flowforge_workspaces');
-      if (data) {
-        const parsed = JSON.parse(data);
-        delete parsed[name];
-        localStorage.setItem('flowforge_workspaces', JSON.stringify(parsed));
-        
-        const updatedWorkspaces = workspaces.filter(w => w !== name);
-        setWorkspaces(updatedWorkspaces);
-        
-        if (currentWorkspace === name) {
-          if (updatedWorkspaces.length > 0) {
-             handleLoadWorkspace(updatedWorkspaces[0]);
-          } else {
-             handleNewFlowchart();
-          }
+      const parsed = data ? JSON.parse(data) : {};
+      delete parsed[name];
+      localStorage.setItem('flowforge_workspaces', JSON.stringify(parsed));
+      
+      const updatedWorkspaces = workspaces.filter(w => w !== name);
+      setWorkspaces(updatedWorkspaces);
+      
+      if (currentWorkspace === name) {
+        if (updatedWorkspaces.length > 0) {
+           handleLoadWorkspace(updatedWorkspaces[0]);
+        } else {
+           handleNewFlowchart();
+           setCurrentWorkspace('');
         }
-        showToast(`Workspace "${name}" deleted!`, 'info');
       }
+      showToast(`Workspace "${name}" deleted!`, 'info');
     } catch {
       showToast('Could not delete workspace', 'error');
     }
@@ -272,20 +276,30 @@ export default function App() {
       try {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content) as Block[];
-        if (Array.isArray(parsed)) {
+        const isValid = Array.isArray(parsed) && parsed.every(b => b && typeof b === 'object' && typeof b.id === 'string' && ['terminator', 'process', 'decision', 'io'].includes(b.type));
+        
+        if (isValid) {
             setBlocks(parsed);
-            let newName = file.name.replace('.json', '');
+            setSelectedBlockId(null);
+            setActiveParentId(null);
             
-            if (workspaces.includes(newName)) {
-                newName = `${newName}-${Math.random().toString(36).substring(2, 6)}`;
-            }
+            let newName = file.name.replace('.json', '');
             
             const data = localStorage.getItem('flowforge_workspaces');
             const parsedStorage = data ? JSON.parse(data) : {};
+            const currentKeys = Object.keys(parsedStorage);
+            
+            if (currentKeys.includes(newName)) {
+                newName = `${newName}-${Math.random().toString(36).substring(2, 6)}`;
+            }
+            if (newName === '__proto__' || newName === 'constructor' || newName === 'prototype') {
+                newName = `Workspace-${Math.random().toString(36).substring(2, 6)}`;
+            }
+            
             parsedStorage[newName] = parsed;
             localStorage.setItem('flowforge_workspaces', JSON.stringify(parsedStorage));
             
-            setWorkspaces(prev => [...prev, newName]);
+            setWorkspaces([...currentKeys, newName]);
             setCurrentWorkspace(newName);
             
             showToast(`Imported "${newName}" successfully!`, 'success');
