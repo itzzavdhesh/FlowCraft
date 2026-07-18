@@ -53,7 +53,31 @@ const initialDemoBlocks: Block[] = [
 ];
 
 const isValidWorkspaceBlocks = (blocks: any): blocks is Block[] => {
-  return Array.isArray(blocks) && blocks.every(b => b && typeof b === 'object' && typeof b.id === 'string' && ['terminator', 'process', 'decision', 'io'].includes(b.type));
+  if (!Array.isArray(blocks)) return false;
+  
+  const idSet = new Set<string>();
+  
+  return blocks.every(b => {
+    if (!b || typeof b !== 'object') return false;
+    
+    // Core fields
+    if (typeof b.id !== 'string' || b.id.trim() === '') return false;
+    if (typeof b.label !== 'string') return false;
+    if (!['terminator', 'process', 'decision', 'io'].includes(b.type)) return false;
+    
+    // Duplicate ID check
+    if (idSet.has(b.id)) return false;
+    idSet.add(b.id);
+    
+    // Optional string fields
+    if (b.targetId !== undefined && typeof b.targetId !== 'string') return false;
+    if (b.yesLabel !== undefined && typeof b.yesLabel !== 'string') return false;
+    if (b.noLabel !== undefined && typeof b.noLabel !== 'string') return false;
+    if (b.yesTargetId !== undefined && typeof b.yesTargetId !== 'string') return false;
+    if (b.noTargetId !== undefined && typeof b.noTargetId !== 'string') return false;
+    
+    return true;
+  });
 };
 
 export default function App() {
@@ -79,6 +103,10 @@ export default function App() {
           } else {
             setBlocks(initialDemoBlocks);
           }
+        } else {
+          setWorkspaces([]);
+          setCurrentWorkspace('');
+          setBlocks([]);
         }
       } else {
         // Migration from old version
@@ -194,9 +222,15 @@ export default function App() {
     showToast(`Adding after: ${parentBlock.label}`, 'success');
   };
 
+  // Helper to validate workspace names consistently
+  const isInvalidWorkspaceName = (name: string) => {
+    const trimmed = name.trim();
+    return trimmed === '' || trimmed === '__proto__' || trimmed === 'constructor' || trimmed === 'prototype';
+  };
+
   // Persistent Local Storage hooks
   const handleSaveWorkspace = (name: string) => {
-    if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+    if (isInvalidWorkspaceName(name)) {
       showToast('Invalid workspace name', 'error');
       return;
     }
@@ -291,28 +325,35 @@ export default function App() {
         const parsed = JSON.parse(content) as Block[];
         
         if (isValidWorkspaceBlocks(parsed)) {
-            setBlocks(parsed);
-            setSelectedBlockId(null);
-            setActiveParentId(null);
-            
-            let baseName = file.name.replace('.json', '');
+            let baseName = file.name.replace('.json', '').trim();
+            if (!baseName) {
+                baseName = 'Imported Workspace';
+            }
             let newName = baseName;
             
             const data = localStorage.getItem('flowforge_workspaces');
             const parsedStorage = data ? JSON.parse(data) : {};
             const currentKeys = Object.keys(parsedStorage);
             
-            while (currentKeys.includes(newName) || newName === '__proto__' || newName === 'constructor' || newName === 'prototype') {
+            while (currentKeys.includes(newName) || isInvalidWorkspaceName(newName)) {
                 newName = `${baseName}-${Math.random().toString(36).substring(2, 6)}`;
             }
             
-            parsedStorage[newName] = parsed;
-            localStorage.setItem('flowforge_workspaces', JSON.stringify(parsedStorage));
-            
-            setWorkspaces([...currentKeys, newName]);
-            setCurrentWorkspace(newName);
-            
-            showToast(`Imported "${newName}" successfully!`, 'success');
+            try {
+                parsedStorage[newName] = parsed;
+                localStorage.setItem('flowforge_workspaces', JSON.stringify(parsedStorage));
+                
+                // Only update React state after successfully persisting to localStorage
+                setBlocks(parsed);
+                setSelectedBlockId(null);
+                setActiveParentId(null);
+                setWorkspaces([...currentKeys, newName]);
+                setCurrentWorkspace(newName);
+                
+                showToast(`Imported "${newName}" successfully!`, 'success');
+            } catch {
+                showToast('Storage quota exceeded or error saving to local storage.', 'error');
+            }
         } else {
             showToast('Invalid workspace file', 'error');
         }

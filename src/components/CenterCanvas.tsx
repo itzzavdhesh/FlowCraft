@@ -365,7 +365,7 @@ export default function CenterCanvas({
           <select 
             value={currentWorkspace} 
             onChange={(e) => onLoad(e.target.value)}
-            className="text-sm font-bold text-gray-800 bg-transparent border-none focus:ring-0 cursor-pointer outline-none max-w-[150px] truncate appearance-none"
+            className="text-sm font-bold text-gray-800 bg-transparent border-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-sm max-w-[150px] truncate appearance-none"
             style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
           >
             {workspaces.map(w => <option key={w} value={w}>{w}</option>)}
