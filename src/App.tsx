@@ -3,12 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import LeftSidebar from './components/LeftSidebar';
 import CenterCanvas from './components/CenterCanvas';
 import RightSidebar from './components/RightSidebar';
 import Toast from './components/Toast';
 import { Block, ToastConfig, LayoutDirection } from './types';
+import { socket, debounce } from './utils/socket';
 
 // Default blueprint layout tracking
 const initialDemoBlocks: Block[] = [
@@ -157,6 +158,64 @@ export default function App() {
 
   const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
+  const emitUpdateDebounced = useRef(
+    debounce((block: Block) => socket.emit('update-block', block), 300)
+  ).current;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    let wsId = params.get('workspace');
+    if (!wsId) {
+      wsId = Math.random().toString(36).substring(2, 9);
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('workspace', wsId);
+      window.history.replaceState({}, '', newUrl);
+    }
+    
+    socket.connect();
+    socket.emit('join-workspace', wsId, (initialState: { blocks: Block[] }) => {
+      if (initialState && initialState.blocks.length > 0) {
+        setBlocks(initialState.blocks);
+      } else {
+        socket.emit('full-sync', initialDemoBlocks);
+      }
+    });
+
+    const onBlockAdded = (block: Block) => setBlocks(prev => [...prev, block]);
+    const onBlockUpdated = (updatedBlock: Block) => setBlocks(prev => prev.map(b => b.id === updatedBlock.id ? updatedBlock : b));
+    const onBlockDeleted = (id: string) => setBlocks(prev => {
+      let updated = prev.filter((b) => b.id !== id);
+      return updated.map((b) => {
+        const next = { ...b };
+        if (next.targetId === id) next.targetId = '';
+        if (next.yesTargetId === id) next.yesTargetId = '';
+        if (next.noTargetId === id) next.noTargetId = '';
+        return next;
+      });
+    });
+    const onBlocksCleared = () => {
+      setBlocks([]);
+      setSelectedBlockId(null);
+      setActiveParentId(null);
+    };
+    const onFullSync = (newBlocks: Block[]) => setBlocks(newBlocks);
+
+    socket.on('block-added', onBlockAdded);
+    socket.on('block-updated', onBlockUpdated);
+    socket.on('block-deleted', onBlockDeleted);
+    socket.on('blocks-cleared', onBlocksCleared);
+    socket.on('full-sync-update', onFullSync);
+
+    return () => {
+      socket.off('block-added', onBlockAdded);
+      socket.off('block-updated', onBlockUpdated);
+      socket.off('block-deleted', onBlockDeleted);
+      socket.off('blocks-cleared', onBlocksCleared);
+      socket.off('full-sync-update', onFullSync);
+      socket.disconnect();
+    };
+  }, []);
+
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     const newToast: ToastConfig = {
@@ -178,6 +237,7 @@ export default function App() {
     setBlocks((prev) => {
       let updated = [...prev];
       let insertedTargetId: string | undefined = undefined;
+      let modifiedActiveBlock: Block | undefined = undefined;
 
       if (activeParentId) {
         const activeIdx = updated.findIndex((b) => b.id === activeParentId);
@@ -198,6 +258,7 @@ export default function App() {
               updated[activeIdx] = { ...activeBlock, targetId: newId };
             }
           }
+          modifiedActiveBlock = updated[activeIdx];
         }
       }
 
@@ -206,6 +267,11 @@ export default function App() {
         id: newId,
         targetId: insertedTargetId,
       };
+
+      socket.emit('add-block', newBlock);
+      if (modifiedActiveBlock) {
+        socket.emit('update-block', modifiedActiveBlock);
+      }
 
       return [...updated, newBlock];
     });
@@ -221,6 +287,7 @@ export default function App() {
   // Update node details (Right panel)
   const handleUpdateBlock = (updatedBlock: Block) => {
     setBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
+    emitUpdateDebounced(updatedBlock);
   };
 
   // Delete block
@@ -235,12 +302,18 @@ export default function App() {
       // Clean up references to this deleted block from other blocks
       return updated.map((b) => {
         const next = { ...b };
-        if (next.targetId === id) next.targetId = '';
-        if (next.yesTargetId === id) next.yesTargetId = '';
-        if (next.noTargetId === id) next.noTargetId = '';
+        let changed = false;
+        if (next.targetId === id) { next.targetId = ''; changed = true; }
+        if (next.yesTargetId === id) { next.yesTargetId = ''; changed = true; }
+        if (next.noTargetId === id) { next.noTargetId = ''; changed = true; }
+        if (changed) {
+          socket.emit('update-block', next);
+        }
         return next;
       });
     });
+
+    socket.emit('delete-block', id);
 
     if (selectedBlockId === id) {
       setSelectedBlockId(null);
@@ -433,6 +506,7 @@ export default function App() {
     setBlocks([]);
     setSelectedBlockId(null);
     setActiveParentId(null);
+    socket.emit('clear-blocks');
     showToast('Flowchart cleared. Canvas is ready!', 'info');
   };
 

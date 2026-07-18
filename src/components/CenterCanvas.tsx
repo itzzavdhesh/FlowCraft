@@ -3,7 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { socket } from '../utils/socket';
 import { 
   Play, 
   Save, 
@@ -78,6 +79,66 @@ export default function CenterCanvas({
   const nodes = calculateLayout(blocks, layoutDirection);
   const connections = calculateConnections(nodes, layoutDirection);
 
+  const [remoteCursors, setRemoteCursors] = useState<Record<string, { x: number; y: number }>>({});
+  const [remoteSelections, setRemoteSelections] = useState<Record<string, string>>({});
+  const [userColors, setUserColors] = useState<Record<string, string>>({});
+  
+  const getUserColor = useCallback((userId: string) => {
+    setUserColors(prev => {
+      if (prev[userId]) return prev;
+      const colors = ['#f43f5e', '#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4'];
+      const color = colors[Object.keys(prev).length % colors.length];
+      return { ...prev, [userId]: color };
+    });
+  }, []);
+
+  useEffect(() => {
+    const onCursorUpdate = (data: { x: number; y: number; userId: string }) => {
+      setRemoteCursors(prev => ({ ...prev, [data.userId]: { x: data.x, y: data.y } }));
+      getUserColor(data.userId);
+    };
+
+    const onSelectionUpdate = (data: { selectedId: string | null; userId: string }) => {
+      setRemoteSelections(prev => {
+        const next = { ...prev };
+        if (data.selectedId === null) {
+          delete next[data.userId];
+        } else {
+          next[data.userId] = data.selectedId;
+        }
+        return next;
+      });
+      getUserColor(data.userId);
+    };
+    
+    const onUserLeft = (data: { userId: string }) => {
+      setRemoteCursors(prev => {
+        const next = { ...prev };
+        delete next[data.userId];
+        return next;
+      });
+      setRemoteSelections(prev => {
+        const next = { ...prev };
+        delete next[data.userId];
+        return next;
+      });
+    };
+
+    socket.on('cursor-update', onCursorUpdate);
+    socket.on('selection-update', onSelectionUpdate);
+    socket.on('user-left', onUserLeft);
+
+    return () => {
+      socket.off('cursor-update', onCursorUpdate);
+      socket.off('selection-update', onSelectionUpdate);
+      socket.off('user-left', onUserLeft);
+    };
+  }, [getUserColor]);
+
+  useEffect(() => {
+    socket.emit('node-select', { selectedId: selectedBlockId });
+  }, [selectedBlockId]);
+
   // Zoom & Pan states
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -107,7 +168,18 @@ export default function CenterCanvas({
     };
   };
 
+  const lastEmit = useRef<number>(0);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const now = Date.now();
+    if (now - lastEmit.current > 32 && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left - pan.x) / scale;
+      const y = (e.clientY - rect.top - pan.y) / scale;
+      socket.emit('cursor-move', { x, y });
+      lastEmit.current = now;
+    }
+
     if (!isPanning) return;
     const newX = e.clientX - panStart.current.x;
     const newY = e.clientY - panStart.current.y;
@@ -359,10 +431,12 @@ export default function CenterCanvas({
     }
   };
 
-  const getShapeStyle = (type: string, isSelected: boolean) => {
+  const getShapeStyle = (type: string, isSelected: boolean, remoteColor?: string) => {
     const baseClass = "absolute transition-all duration-250 cursor-pointer flex items-center justify-center border-2 shadow-md ";
     const selectedClass = isSelected 
       ? "border-indigo-600 dark:border-indigo-400 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 shadow-lg scale-102"
+      : remoteColor
+      ? "shadow-lg scale-101 border-transparent"
       : "border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 hover:shadow-lg hover:scale-101";
 
     switch (type) {
@@ -700,6 +774,10 @@ export default function CenterCanvas({
               {nodes.map((node) => {
                 const isSelected = selectedBlockId === node.block.id;
                 
+                // Determine remote selection color
+                const remoteUserIds = Object.entries(remoteSelections).filter(([_, id]) => id === node.block.id).map(([userId]) => userId);
+                const remoteColor = remoteUserIds.length > 0 ? userColors[remoteUserIds[0]] : undefined;
+                
                 // Custom structures for specialized Shapes
                 if (node.block.type === 'decision') {
                   return (
@@ -722,11 +800,14 @@ export default function CenterCanvas({
                           height: `${DIAMOND_SIZE}px`,
                           left: `${(NODE_WIDTH - DIAMOND_SIZE) / 2}px`,
                           top: `${(NODE_HEIGHT - DIAMOND_SIZE) / 2}px`,
+                          ...(remoteColor && !isSelected ? { borderColor: remoteColor, boxShadow: `0 0 0 4px ${remoteColor}40` } : {})
                         }}
                         className={`absolute border-2 shadow-md transition-all duration-200 bg-white dark:bg-slate-800 rotate-45 ${
                           isSelected 
                             ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102' 
-                            : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
+                            : remoteColor 
+                              ? 'shadow-lg scale-101 border-transparent'
+                              : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
                         }`}
                       />
                       {/* Text wrapper kept upright at the same coordinates, centered perfectly */}
@@ -766,10 +847,13 @@ export default function CenterCanvas({
                         className={`absolute inset-0 transition-all duration-250 bg-white dark:bg-slate-800 border-2 rounded-md shadow-md ${
                           isSelected 
                             ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102' 
-                            : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
+                            : remoteColor
+                              ? 'shadow-lg scale-101 border-transparent'
+                              : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
                         }`}
                         style={{
                           transform: 'skewX(-15deg)',
+                          ...(remoteColor && !isSelected ? { borderColor: remoteColor, boxShadow: `0 0 0 4px ${remoteColor}40` } : {})
                         }}
                       />
                       
@@ -796,8 +880,9 @@ export default function CenterCanvas({
                       top: `${node.y}px`,
                       width: `${NODE_WIDTH}px`,
                       height: `${NODE_HEIGHT}px`,
+                      ...(remoteColor && !isSelected ? { borderColor: remoteColor, boxShadow: `0 0 0 4px ${remoteColor}40` } : {})
                     }}
-                    className={getShapeStyle(node.block.type, isSelected)}
+                    className={getShapeStyle(node.block.type, isSelected, remoteColor)}
                   >
                     <div className="px-4 text-center">
                       <span className="text-xs font-bold line-clamp-2 leading-tight">
@@ -808,6 +893,35 @@ export default function CenterCanvas({
                 );
               })}
             </div>
+
+            {/* Render Remote Cursors */}
+            {Object.entries(remoteCursors).map(([userId, pos]) => {
+              const color = userColors[userId] || '#6366f1';
+              return (
+                <div
+                  key={userId}
+                  className="absolute pointer-events-none z-50 transition-all duration-75"
+                  style={{
+                    left: 0,
+                    top: 0,
+                    transform: `translate(${pan.x + pos.x * scale}px, ${pan.y + pos.y * scale}px)`,
+                  }}
+                >
+                  <MousePointer 
+                    className="w-5 h-5 drop-shadow-md" 
+                    fill={color}
+                    color="white" 
+                    strokeWidth={1.5} 
+                  />
+                  <div
+                    className="absolute top-5 left-3 px-2 py-0.5 rounded-md text-[10px] font-bold text-white shadow-sm whitespace-nowrap"
+                    style={{ backgroundColor: color }}
+                  >
+                    Guest {userId.substring(0, 4)}
+                  </div>
+                </div>
+              );
+            })}
 
             {/* Float Zoom and Pan Control HUD Panel */}
             <div className="zoom-controls absolute bottom-6 right-6 flex items-center gap-2 bg-white px-3 py-2 rounded-xl shadow-lg border border-gray-150 z-20 select-none">
