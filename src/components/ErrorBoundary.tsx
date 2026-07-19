@@ -37,11 +37,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
               An unexpected error occurred in the application. Please try refreshing the page.
             </p>
-            {this.state.error && (
-              <div className="text-left bg-gray-100 dark:bg-gray-900 p-4 rounded-lg overflow-x-auto text-xs font-mono text-gray-700 dark:text-gray-300 mb-6 max-h-32">
-                {this.state.error.toString()}
-              </div>
-            )}
+
             <button
               onClick={() => window.location.reload()}
               className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors cursor-pointer"
