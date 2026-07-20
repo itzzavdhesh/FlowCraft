@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Zap, Edit2, Trash2, Plus, X } from 'lucide-react';
+import { Zap, Edit2, Trash2, Plus, X, Sparkles } from 'lucide-react';
 import { ShapeType, Block } from '../types';
 
 interface LeftSidebarProps {
@@ -15,6 +15,8 @@ interface LeftSidebarProps {
   onDeleteBlock: (id: string) => void;
   activeParentId: string | null;
   onCancelActiveParent: () => void;
+  onLoadAIBlocks?: (blocks: Block[]) => void;
+  showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
 }
 
 export default function LeftSidebar({
@@ -25,6 +27,8 @@ export default function LeftSidebar({
   onDeleteBlock,
   activeParentId,
   onCancelActiveParent,
+  onLoadAIBlocks,
+  showToast,
 }: LeftSidebarProps) {
   const [selectedType, setSelectedType] = useState<ShapeType>('terminator');
   const [blockLabel, setBlockLabel] = useState('');
@@ -32,6 +36,34 @@ export default function LeftSidebar({
   // Decision specific branch labels
   const [yesLabel, setYesLabel] = useState('Yes');
   const [noLabel, setNoLabel] = useState('No');
+
+  // AI Flow Generator States
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateAI = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
+      const data = await response.json();
+      if (response.ok && Array.isArray(data)) {
+        onLoadAIBlocks?.(data);
+        showToast?.("Successfully generated flowchart with Gemini AI!", "success");
+        setAiPrompt('');
+      } else {
+        showToast?.(data.error || "Failed to generate flowchart.", "error");
+      }
+    } catch (e: any) {
+      showToast?.(e.message || "Failed to connect to the generator service.", "error");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const activeParentBlock = blocks.find((b) => b.id === activeParentId);
 
@@ -217,6 +249,35 @@ export default function LeftSidebar({
             </button>
           </div>
         </form>
+
+        {/* Gemini AI Generator Section */}
+        <div className="border-t border-gray-100 pt-5 space-y-3">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-indigo-650 animate-pulse" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-gray-700">AI Flow Generator</h2>
+          </div>
+          <p className="text-[10px] text-gray-400 leading-normal">
+            Enter a prompt describing your logic and Gemini will automatically generate a custom flowchart.
+          </p>
+          <div className="space-y-2">
+            <textarea
+              rows={2}
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              placeholder="e.g. User logs in, check database, if registered show dashboard else redirect to signup"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 bg-gray-50/50 focus:bg-white placeholder:text-gray-400 font-sans resize-none"
+            />
+            <button
+              type="button"
+              onClick={handleGenerateAI}
+              disabled={isGenerating || !aiPrompt.trim()}
+              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-[11px] rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 fill-current" />
+              {isGenerating ? 'Generating Flow...' : 'Generate with Gemini'}
+            </button>
+          </div>
+        </div>
 
         <div className="border-t border-gray-100 pt-5">
           <h2 id="left-sidebar-list-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 block">Blocks</h2>

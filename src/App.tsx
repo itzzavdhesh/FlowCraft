@@ -239,6 +239,14 @@ export default function App() {
         onDeleteBlock={handleDeleteBlock}
         activeParentId={activeParentId}
         onCancelActiveParent={() => setActiveParentId(null)}
+        onLoadAIBlocks={(newBlocks) => {
+          setBlocks(newBlocks);
+          if (newBlocks.length > 0) {
+            setSelectedBlockId(newBlocks[0].id);
+          }
+          setActiveParentId(null);
+        }}
+        showToast={showToast}
       />
 
       {/* CENTER GRID CANVAS ZONE */}
