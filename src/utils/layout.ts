@@ -36,13 +36,22 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
       }
     };
     if (b.type === 'decision') {
-      if (b.yesTargetId && b.yesTargetId !== b.id) {
-        incomingMap.set(b.yesTargetId, (incomingMap.get(b.yesTargetId) || 0) + 1);
-        addParent(b.yesTargetId, b.id);
-      }
-      if (b.noTargetId && b.noTargetId !== b.id) {
-        incomingMap.set(b.noTargetId, (incomingMap.get(b.noTargetId) || 0) + 1);
-        addParent(b.noTargetId, b.id);
+      if (b.branches && b.branches.length > 0) {
+        b.branches.forEach((br) => {
+          if (br.targetId && br.targetId !== b.id) {
+            incomingMap.set(br.targetId, (incomingMap.get(br.targetId) || 0) + 1);
+            addParent(br.targetId, b.id);
+          }
+        });
+      } else {
+        if (b.yesTargetId && b.yesTargetId !== b.id) {
+          incomingMap.set(b.yesTargetId, (incomingMap.get(b.yesTargetId) || 0) + 1);
+          addParent(b.yesTargetId, b.id);
+        }
+        if (b.noTargetId && b.noTargetId !== b.id) {
+          incomingMap.set(b.noTargetId, (incomingMap.get(b.noTargetId) || 0) + 1);
+          addParent(b.noTargetId, b.id);
+        }
       }
     } else {
       if (b.targetId && b.targetId !== b.id) {
@@ -137,21 +146,40 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
       const parentBlock = blocks.find(b => b.id === pId);
       
       if (parentBlock?.type === 'decision') {
-        if (parentBlock.yesTargetId === id) {
-          // YES BRANCH: Placed to the BOTTOM-RIGHT of the diamond
-          // Same X position as center + 200px (right column), Y below diamond (+150px)
-          row = parentCoord.row + 1;
-          col = parentCoord.col + 1;
-          while (occupied.has(`${row},${col}`)) {
-            row++;
+        if (parentBlock.branches && parentBlock.branches.length > 0) {
+          const brIdx = parentBlock.branches.findIndex(br => br.targetId === id);
+          if (brIdx !== -1) {
+            const numBranches = parentBlock.branches.length;
+            let offset = 0;
+            if (numBranches > 1) {
+              const fraction = brIdx / (numBranches - 1);
+              offset = Math.round((fraction - 0.5) * numBranches * 1.5);
+            }
+            row = parentCoord.row + 1;
+            col = parentCoord.col + offset;
+            while (occupied.has(`${row},${col}`)) {
+              row++;
+            }
+          } else {
+            row = parentCoord.row + 1;
+            col = parentCoord.col;
+            while (occupied.has(`${row},${col}`)) {
+              row++;
+            }
           }
         } else {
-          // NO BRANCH: Placed to the BOTTOM-LEFT of the diamond
-          // Same X position as center - 200px (left column), Y below diamond (+150px)
-          row = parentCoord.row + 1;
-          col = parentCoord.col - 1;
-          while (occupied.has(`${row},${col}`)) {
-            row++;
+          if (parentBlock.yesTargetId === id) {
+            row = parentCoord.row + 1;
+            col = parentCoord.col + 1;
+            while (occupied.has(`${row},${col}`)) {
+              row++;
+            }
+          } else {
+            row = parentCoord.row + 1;
+            col = parentCoord.col - 1;
+            while (occupied.has(`${row},${col}`)) {
+              row++;
+            }
           }
         }
       } else {
@@ -249,16 +277,49 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
     const block = source.block;
 
     if (block.type === 'decision') {
-      const sourceCx = source.x + NODE_WIDTH / 2;
-      const sourceCy = source.y + NODE_HEIGHT / 2;
+      if (block.branches && block.branches.length > 0) {
+        block.branches.forEach((br, idx) => {
+          if (br.targetId && br.targetId !== block.id) {
+            const target = nodes.find((n) => n.block.id === br.targetId);
+            if (target) {
+              lines.push(generateConnection(source, target, br.label, `branch-${idx}` as any, sharedTargets.has(target.block.id)));
+            } else {
+              lines.push(generateUnconnectedBranch(source, idx, block.branches!.length, br.label));
+            }
+          } else {
+            lines.push(generateUnconnectedBranch(source, idx, block.branches!.length, br.label));
+          }
+        });
+      } else {
+        const sourceCx = source.x + NODE_WIDTH / 2;
+        const sourceCy = source.y + NODE_HEIGHT / 2;
 
-      // YES BRANCH
-      if (block.yesTargetId && block.yesTargetId !== block.id) {
-        const target = nodes.find((n) => n.block.id === block.yesTargetId);
-        if (target) {
-          lines.push(generateConnection(source, target, block.yesLabel || 'Yes', 'yes', sharedTargets.has(target.block.id)));
+        // YES BRANCH
+        if (block.yesTargetId && block.yesTargetId !== block.id) {
+          const target = nodes.find((n) => n.block.id === block.yesTargetId);
+          if (target) {
+            lines.push(generateConnection(source, target, block.yesLabel || 'Yes', 'yes', sharedTargets.has(target.block.id)));
+          } else {
+            // If the target is set but somehow not in the nodes, treat as unconnected
+            const startX = sourceCx + DIAMOND_HALF_DIAG;
+            const startY = sourceCy;
+            const endX = startX + 60;
+            const endY = startY;
+            lines.push({
+              id: `${source.block.id}-unconnected-yes`,
+              sourceId: source.block.id,
+              path: `M ${startX} ${startY} L ${endX} ${endY}`,
+              label: block.yesLabel || 'Yes',
+              labelX: startX + 25,
+              labelY: startY - 14,
+              isUnconnected: true,
+              unconnectedDir: 'right',
+              endX,
+              endY,
+            });
+          }
         } else {
-          // If the target is set but somehow not in the nodes, treat as unconnected
+          // Unconnected or pointing to self
           const startX = sourceCx + DIAMOND_HALF_DIAG;
           const startY = sourceCy;
           const endX = startX + 60;
@@ -276,33 +337,33 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
             endY,
           });
         }
-      } else {
-        // Unconnected or pointing to self
-        const startX = sourceCx + DIAMOND_HALF_DIAG;
-        const startY = sourceCy;
-        const endX = startX + 60;
-        const endY = startY;
-        lines.push({
-          id: `${source.block.id}-unconnected-yes`,
-          sourceId: source.block.id,
-          path: `M ${startX} ${startY} L ${endX} ${endY}`,
-          label: block.yesLabel || 'Yes',
-          labelX: startX + 25,
-          labelY: startY - 14,
-          isUnconnected: true,
-          unconnectedDir: 'right',
-          endX,
-          endY,
-        });
-      }
 
-      // NO BRANCH
-      if (block.noTargetId && block.noTargetId !== block.id) {
-        const target = nodes.find((n) => n.block.id === block.noTargetId);
-        if (target) {
-          lines.push(generateConnection(source, target, block.noLabel || 'No', 'no', sharedTargets.has(target.block.id)));
+        // NO BRANCH
+        if (block.noTargetId && block.noTargetId !== block.id) {
+          const target = nodes.find((n) => n.block.id === block.noTargetId);
+          if (target) {
+            lines.push(generateConnection(source, target, block.noLabel || 'No', 'no', sharedTargets.has(target.block.id)));
+          } else {
+            // If the target is set but somehow not in the nodes, treat as unconnected
+            const startX = sourceCx - DIAMOND_HALF_DIAG;
+            const startY = sourceCy;
+            const endX = startX - 60;
+            const endY = startY;
+            lines.push({
+              id: `${source.block.id}-unconnected-no`,
+              sourceId: source.block.id,
+              path: `M ${startX} ${startY} L ${endX} ${endY}`,
+              label: block.noLabel || 'No',
+              labelX: startX - 25,
+              labelY: startY - 14,
+              isUnconnected: true,
+              unconnectedDir: 'right',
+              endX,
+              endY,
+            });
+          }
         } else {
-          // If the target is set but somehow not in the nodes, treat as unconnected
+          // Unconnected or pointing to self
           const startX = sourceCx - DIAMOND_HALF_DIAG;
           const startY = sourceCy;
           const endX = startX - 60;
@@ -320,24 +381,6 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
             endY,
           });
         }
-      } else {
-        // Unconnected or pointing to self
-        const startX = sourceCx - DIAMOND_HALF_DIAG;
-        const startY = sourceCy;
-        const endX = startX - 60;
-        const endY = startY;
-        lines.push({
-          id: `${source.block.id}-unconnected-no`,
-          sourceId: source.block.id,
-          path: `M ${startX} ${startY} L ${endX} ${endY}`,
-          label: block.noLabel || 'No',
-          labelX: startX - 25,
-          labelY: startY - 14,
-          isUnconnected: true,
-          unconnectedDir: 'right',
-          endX,
-          endY,
-        });
       }
     } else {
       // Standard Connection (Terminator, Process, IO)
@@ -353,6 +396,52 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
   return lines;
 }
 
+function generateUnconnectedBranch(
+  source: CanvasNode,
+  idx: number,
+  total: number,
+  label: string
+): SvgLine {
+  const sourceCx = source.x + NODE_WIDTH / 2;
+  const sourceCy = source.y + NODE_HEIGHT / 2;
+
+  let dir: 'left' | 'right' | 'down' = 'down';
+  let startX = sourceCx;
+  let startY = source.y + NODE_HEIGHT;
+
+  if (total === 2) {
+    dir = idx === 0 ? 'left' : 'right';
+  } else if (total >= 3) {
+    if (idx === 0) dir = 'left';
+    else if (idx === total - 1) dir = 'right';
+    else dir = 'down';
+  }
+
+  if (dir === 'left') {
+    startX = sourceCx - DIAMOND_HALF_DIAG;
+    startY = sourceCy;
+  } else if (dir === 'right') {
+    startX = sourceCx + DIAMOND_HALF_DIAG;
+    startY = sourceCy;
+  }
+
+  const endX = dir === 'left' ? startX - 60 : (dir === 'right' ? startX + 60 : startX);
+  const endY = dir === 'down' ? startY + 60 : startY;
+
+  return {
+    id: `${source.block.id}-unconnected-branch-${idx}`,
+    sourceId: source.block.id,
+    path: `M ${startX} ${startY} L ${endX} ${endY}`,
+    label: label,
+    labelX: dir === 'left' ? startX - 25 : (dir === 'right' ? startX + 25 : startX + 15),
+    labelY: dir === 'down' ? startY + 30 : startY - 14,
+    isUnconnected: true,
+    unconnectedDir: dir === 'down' ? 'down' : 'right',
+    endX,
+    endY,
+  };
+}
+
 function generateConnection(
   source: CanvasNode,
   target: CanvasNode,
@@ -360,6 +449,92 @@ function generateConnection(
   connectionType: 'yes' | 'no' | 'standard',
   isSharedTarget: boolean = false
 ): SvgLine {
+  const isLoopback = target.y < source.y;
+
+  if (isLoopback) {
+    const isSourceDecision = source.block.type === 'decision';
+    const isTargetDecision = target.block.type === 'decision';
+
+    const sourceCx = source.x + NODE_WIDTH / 2;
+    const sourceCy = source.y + NODE_HEIGHT / 2;
+    const targetCx = target.x + NODE_WIDTH / 2;
+    const targetCy = target.y + NODE_HEIGHT / 2;
+
+    let dir: 'left' | 'right' | 'down' = 'down';
+    if (isSourceDecision) {
+      if (connectionType === 'yes') {
+        dir = 'right';
+      } else if (connectionType === 'no') {
+        dir = 'left';
+      } else if (typeof connectionType === 'string' && connectionType.startsWith('branch-')) {
+        const idx = parseInt(connectionType.split('-')[1]);
+        const total = source.block.branches ? source.block.branches.length : 2;
+        if (total === 2) {
+          dir = idx === 0 ? 'left' : 'right';
+        } else if (total >= 3) {
+          if (idx === 0) dir = 'left';
+          else if (idx === total - 1) dir = 'right';
+          else dir = 'down';
+        }
+      }
+    }
+
+    const routeRight = isSourceDecision
+      ? (dir === 'right')
+      : (source.col >= 0);
+
+    let startX = 0;
+    let startY = 0;
+    if (isSourceDecision) {
+      if (dir === 'left') {
+        startX = sourceCx - DIAMOND_HALF_DIAG;
+        startY = sourceCy;
+      } else if (dir === 'right') {
+        startX = sourceCx + DIAMOND_HALF_DIAG;
+        startY = sourceCy;
+      } else {
+        startX = sourceCx;
+        startY = sourceCy + DIAMOND_HALF_DIAG;
+      }
+    } else {
+      startX = routeRight ? source.x + NODE_WIDTH : source.x;
+      startY = sourceCy;
+    }
+
+    let endX = 0;
+    let endY = 0;
+    if (isTargetDecision) {
+      endX = routeRight ? targetCx + DIAMOND_HALF_DIAG : targetCx - DIAMOND_HALF_DIAG;
+      endY = targetCy;
+    } else {
+      endX = routeRight ? target.x + NODE_WIDTH : target.x;
+      endY = targetCy;
+    }
+
+    const bypassX = routeRight
+      ? Math.max(source.x + NODE_WIDTH, target.x + NODE_WIDTH) + 50
+      : Math.min(source.x, target.x) - 50;
+
+    const path = `M ${startX} ${startY} L ${bypassX} ${startY} L ${bypassX} ${endY} L ${endX} ${endY}`;
+    
+    const labelX = startX + (routeRight ? 25 : -25);
+    const labelY = startY - 10;
+
+    return {
+      id: `${source.block.id}-${target.block.id}-${connectionType}`,
+      sourceId: source.block.id,
+      targetId: target.block.id,
+      path,
+      label,
+      labelX,
+      labelY,
+      startX,
+      startY,
+      endX,
+      endY,
+    };
+  }
+
   const isSourceDecision = source.block.type === 'decision';
   const isTargetDecision = target.block.type === 'decision';
 
@@ -371,13 +546,33 @@ function generateConnection(
   let startX = sourceCx;
   let startY = source.y + NODE_HEIGHT;
 
+  let dir: 'left' | 'right' | 'down' = 'down';
   if (isSourceDecision) {
     if (connectionType === 'yes') {
+      dir = 'right';
+    } else if (connectionType === 'no') {
+      dir = 'left';
+    } else if (typeof connectionType === 'string' && connectionType.startsWith('branch-')) {
+      const idx = parseInt(connectionType.split('-')[1]);
+      const total = source.block.branches ? source.block.branches.length : 2;
+      if (total === 2) {
+        dir = idx === 0 ? 'left' : 'right';
+      } else if (total >= 3) {
+        if (idx === 0) dir = 'left';
+        else if (idx === total - 1) dir = 'right';
+        else dir = 'down';
+      }
+    }
+
+    if (dir === 'left') {
+      startX = sourceCx - DIAMOND_HALF_DIAG;
+      startY = sourceCy;
+    } else if (dir === 'right') {
       startX = sourceCx + DIAMOND_HALF_DIAG;
       startY = sourceCy;
     } else {
-      startX = sourceCx - DIAMOND_HALF_DIAG;
-      startY = sourceCy;
+      startX = sourceCx;
+      startY = sourceCy + DIAMOND_HALF_DIAG;
     }
   }
 
@@ -406,33 +601,34 @@ function generateConnection(
 
   if (isSourceDecision) {
     if (isSharedTarget && source.col !== target.col) {
-      // Decision node to a shared target in a different column:
-      // Exits horizontally, drops down along the middle corridor, and enters horizontally into the side.
       const midX = (sourceCx + targetCx) / 2;
       path = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
       
-      if (connectionType === 'yes') {
+      if (dir === 'right') {
         labelX = startX + 25;
         labelY = startY - 10;
-      } else {
+      } else if (dir === 'left') {
         labelX = startX - 25;
         labelY = startY - 10;
+      } else {
+        labelX = startX + 15;
+        labelY = startY + 15;
       }
     } else {
-      // Decision node to a non-shared target (or same column):
-      // Exits horizontally, then drops down vertically to target top.
       path = `M ${startX} ${startY} L ${endX} ${startY} L ${endX} ${endY}`;
       
-      if (connectionType === 'yes') {
+      if (dir === 'right') {
         labelX = startX + 25;
         labelY = startY - 10;
-      } else {
+      } else if (dir === 'left') {
         labelX = startX - 25;
         labelY = startY - 10;
+      } else {
+        labelX = startX + 15;
+        labelY = startY + 15;
       }
     }
   } else if (isSharedTarget) {
-    // Rejoining arrows: exits bottom of last branch node, goes vertically down to target center level, then horizontally into left/right side
     if (startX === endX) {
       path = `M ${startX} ${startY} L ${endX} ${endY}`;
       labelX = startX + 15;
@@ -443,7 +639,6 @@ function generateConnection(
       labelY = endY - 10;
     }
   } else {
-    // Standard connector
     if (startX === endX) {
       path = `M ${startX} ${startY} L ${endX} ${endY}`;
       labelX = startX + 15;

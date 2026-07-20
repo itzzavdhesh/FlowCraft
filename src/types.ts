@@ -5,6 +5,12 @@
 
 export type ShapeType = 'terminator' | 'process' | 'decision' | 'io';
 
+export interface Branch {
+  id: string;
+  label: string;
+  targetId?: string;
+}
+
 export interface Block {
   id: string;
   type: ShapeType;
@@ -14,6 +20,7 @@ export interface Block {
   noLabel?: string;  // For decision nodes
   yesTargetId?: string; // Target for "Yes" branch
   noTargetId?: string;  // Target for "No" branch
+  branches?: Branch[];  // For multi-branch decision nodes
 }
 
 export interface CanvasNode {

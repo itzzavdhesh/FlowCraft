@@ -47,6 +47,10 @@ export default function LeftSidebar({
         noLabel: noLabel.trim() || 'No',
         yesTargetId: '',
         noTargetId: '',
+        branches: [
+          { id: `br-${Math.random().toString(36).substring(2, 9)}`, label: yesLabel.trim() || 'Yes', targetId: '' },
+          { id: `br-${Math.random().toString(36).substring(2, 9)}`, label: noLabel.trim() || 'No', targetId: '' }
+        ]
       });
     } else {
       onAddBlock({

@@ -74,6 +74,36 @@ export default function RightSidebar({
     onUpdateBlock({ ...selectedBlock, noTargetId: val || undefined });
   };
 
+  const branches = selectedBlock.branches || [
+    { id: 'legacy-yes', label: selectedBlock.yesLabel || 'Yes', targetId: selectedBlock.yesTargetId },
+    { id: 'legacy-no', label: selectedBlock.noLabel || 'No', targetId: selectedBlock.noTargetId }
+  ];
+
+  const handleUpdateBranchLabel = (branchId: string, label: string) => {
+    const updatedBranches = branches.map(br => br.id === branchId ? { ...br, label } : br);
+    onUpdateBlock({ ...selectedBlock, branches: updatedBranches });
+  };
+
+  const handleUpdateBranchTarget = (branchId: string, targetId: string) => {
+    const updatedBranches = branches.map(br => br.id === branchId ? { ...br, targetId: targetId || undefined } : br);
+    onUpdateBlock({ ...selectedBlock, branches: updatedBranches });
+  };
+
+  const handleAddBranch = () => {
+    const newBranch = {
+      id: `br-${Math.random().toString(36).substring(2, 9)}`,
+      label: `Branch ${branches.length + 1}`,
+      targetId: ''
+    };
+    onUpdateBlock({ ...selectedBlock, branches: [...branches, newBranch] });
+  };
+
+  const handleDeleteBranch = (branchId: string) => {
+    if (branches.length <= 1) return;
+    const updatedBranches = branches.filter(br => br.id !== branchId);
+    onUpdateBlock({ ...selectedBlock, branches: updatedBranches });
+  };
+
   return (
     <aside className="w-[260px] h-full bg-white border-l border-gray-100 shadow-sm flex flex-col justify-between shrink-0 select-none overflow-hidden">
       <div className="p-5 border-b border-gray-105">
@@ -90,14 +120,11 @@ export default function RightSidebar({
       <div className="flex-grow p-5 space-y-4 overflow-y-auto custom-scrollbar">
         {/* Warning Indicator for Missing Decision connections */}
         {selectedBlock.type === 'decision' && (
-          !selectedBlock.yesTargetId || 
-          selectedBlock.yesTargetId === selectedBlock.id || 
-          !selectedBlock.noTargetId || 
-          selectedBlock.noTargetId === selectedBlock.id
+          branches.some(br => !br.targetId || br.targetId === selectedBlock.id)
         ) && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] font-semibold tracking-wide flex items-start gap-1.5 leading-normal">
             <span className="text-amber-600 shrink-0 select-none">⚠</span>
-            <span>Set Yes and No branch targets</span>
+            <span>Set all branch targets</span>
           </div>
         )}
 
@@ -115,46 +142,59 @@ export default function RightSidebar({
 
         {/* Dynamic Branch Connection Settings */}
         {selectedBlock.type === 'decision' ? (
-          <div className="space-y-3 pt-2">
-            <div>
-              <label htmlFor={yesTargetSelectId} className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 mb-1">
-                <ArrowRight className="w-3.5 h-3.5" />
-                {selectedBlock.yesLabel || 'Yes'} Branch Target
-              </label>
-              <select
-                id={yesTargetSelectId}
-                value={selectedBlock.yesTargetId || ''}
-                onChange={(e) => handleYesTargetChange(e.target.value)}
-                className="w-full px-2.5 py-1.8 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-indigo-500 cursor-pointer text-gray-700 font-medium"
-              >
-                <option value="">-- Disconnected --</option>
-                {linkableBlocks.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.label} ({b.type.substring(0, 4).toUpperCase()})
-                  </option>
-                ))}
-              </select>
+          <div className="space-y-4 pt-2">
+            <h3 className="text-xs font-bold text-gray-700 font-sans">Decision Branches</h3>
+            <div className="space-y-4">
+              {branches.map((br, index) => (
+                <div key={br.id} className="p-3 bg-gray-50/50 border border-gray-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400">Branch {index + 1}</span>
+                    {branches.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBranch(br.id)}
+                        className="text-[10px] font-bold text-red-500 hover:text-red-700 cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-1">Label</label>
+                    <input
+                      type="text"
+                      value={br.label}
+                      onChange={(e) => handleUpdateBranchLabel(br.id, e.target.value)}
+                      placeholder="e.g. Yes, No, Maybe"
+                      className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:border-indigo-500 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-1">Target</label>
+                    <select
+                      value={br.targetId || ''}
+                      onChange={(e) => handleUpdateBranchTarget(br.id, e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:border-indigo-500 cursor-pointer text-gray-700 font-medium"
+                    >
+                      <option value="">-- Disconnected --</option>
+                      {linkableBlocks.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.label} ({b.type.substring(0, 4).toUpperCase()})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <div>
-              <label htmlFor={noTargetSelectId} className="flex items-center gap-1.5 text-xs font-bold text-amber-700 mb-1">
-                <CornerRightDown className="w-3.5 h-3.5" />
-                {selectedBlock.noLabel || 'No'} Branch Target
-              </label>
-              <select
-                id={noTargetSelectId}
-                value={selectedBlock.noTargetId || ''}
-                onChange={(e) => handleNoTargetChange(e.target.value)}
-                className="w-full px-2.5 py-1.8 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-indigo-500 cursor-pointer text-gray-700 font-medium"
-              >
-                <option value="">-- Disconnected --</option>
-                {linkableBlocks.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.label} ({b.type.substring(0, 4).toUpperCase()})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <button
+              type="button"
+              onClick={handleAddBranch}
+              className="w-full py-2 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-650 font-bold text-xs rounded-lg transition-colors border border-indigo-100 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              + Add Branch
+            </button>
           </div>
         ) : (
           <div className="space-y-3 pt-2">
