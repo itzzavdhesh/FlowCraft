@@ -29,6 +29,7 @@ interface CenterCanvasProps {
   blocks: Block[];
   selectedBlockId: string | null;
   onSelectBlock: (id: string) => void;
+  onUpdateBlock: (updated: Block) => void;
   onSave: () => void;
   onLoad: () => void;
   onExport: (format: 'png' | 'pdf' | 'pptx') => void;
@@ -41,6 +42,7 @@ export default function CenterCanvas({
   blocks,
   selectedBlockId,
   onSelectBlock,
+  onUpdateBlock,
   onSave,
   onLoad,
   onExport,
@@ -61,6 +63,53 @@ export default function CenterCanvas({
   const [isPanning, setIsPanning] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const panStart = useRef({ x: 0, y: 0 });
+
+  // Drag & Drop node state
+  const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
+  const dragStartOffset = useRef({ x: 0, y: 0 });
+  const isDraggingNode = useRef(false);
+
+  const handleNodePointerDown = (e: React.PointerEvent, node: CanvasNode) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    setDraggedNodeId(node.block.id);
+    isDraggingNode.current = true;
+    
+    const nodeOffset = node.block.positionOffset || { x: 0, y: 0 };
+    dragStartOffset.current = {
+      x: e.clientX / scale - nodeOffset.x,
+      y: e.clientY / scale - nodeOffset.y,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleNodePointerMove = (e: React.PointerEvent, nodeId: string) => {
+    if (!isDraggingNode.current || draggedNodeId !== nodeId) return;
+    e.stopPropagation();
+
+    const rawX = e.clientX / scale - dragStartOffset.current.x;
+    const rawY = e.clientY / scale - dragStartOffset.current.y;
+
+    const snapGrid = 20;
+    const snapX = Math.round(rawX / snapGrid) * snapGrid;
+    const snapY = Math.round(rawY / snapGrid) * snapGrid;
+
+    const block = blocks.find(b => b.id === nodeId);
+    if (block) {
+      onUpdateBlock({
+        ...block,
+        positionOffset: { x: snapX, y: snapY }
+      });
+    }
+  };
+
+  const handleNodePointerUp = (e: React.PointerEvent) => {
+    if (isDraggingNode.current) {
+      isDraggingNode.current = false;
+      setDraggedNodeId(null);
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    }
+  };
 
   // Mouse pan event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -614,11 +663,15 @@ export default function CenterCanvas({
                       key={node.block.id}
                       id={`flow-node-${node.block.id}`}
                       onClick={() => onSelectBlock(node.block.id)}
+                      onPointerDown={(e) => handleNodePointerDown(e, node)}
+                      onPointerMove={(e) => handleNodePointerMove(e, node.block.id)}
+                      onPointerUp={handleNodePointerUp}
                       style={{
                         left: `${node.x}px`,
                         top: `${node.y}px`,
                         width: `${NODE_WIDTH}px`,
                         height: `${NODE_HEIGHT}px`,
+                        touchAction: 'none',
                       }}
                       className="absolute group cursor-pointer origin-center"
                     >
@@ -653,18 +706,22 @@ export default function CenterCanvas({
                     </div>
                   );
                 }
-
+ 
                 if (node.block.type === 'io') {
                   return (
                     <div
                       key={node.block.id}
                       id={`flow-node-${node.block.id}`}
                       onClick={() => onSelectBlock(node.block.id)}
+                      onPointerDown={(e) => handleNodePointerDown(e, node)}
+                      onPointerMove={(e) => handleNodePointerMove(e, node.block.id)}
+                      onPointerUp={handleNodePointerUp}
                       style={{
                         left: `${node.x}px`,
                         top: `${node.y}px`,
                         width: `${NODE_WIDTH}px`,
                         height: `${NODE_HEIGHT}px`,
+                        touchAction: 'none',
                       }}
                       className="absolute group cursor-pointer origin-center"
                     >
@@ -691,18 +748,22 @@ export default function CenterCanvas({
                     </div>
                   );
                 }
-
+ 
                 // Standard Process or Terminator shapes
                 return (
                   <div
                     key={node.block.id}
                     id={`flow-node-${node.block.id}`}
                     onClick={() => onSelectBlock(node.block.id)}
+                    onPointerDown={(e) => handleNodePointerDown(e, node)}
+                    onPointerMove={(e) => handleNodePointerMove(e, node.block.id)}
+                    onPointerUp={handleNodePointerUp}
                     style={{
                       left: `${node.x}px`,
                       top: `${node.y}px`,
                       width: `${NODE_WIDTH}px`,
                       height: `${NODE_HEIGHT}px`,
+                      touchAction: 'none',
                     }}
                     className={getShapeStyle(node.block.type, isSelected)}
                   >

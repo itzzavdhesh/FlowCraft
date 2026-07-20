@@ -14,6 +14,7 @@ export interface Block {
   noLabel?: string;  // For decision nodes
   yesTargetId?: string; // Target for "Yes" branch
   noTargetId?: string;  // Target for "No" branch
+  positionOffset?: { x: number; y: number }; // For manual drag offsets
 }
 
 export interface CanvasNode {

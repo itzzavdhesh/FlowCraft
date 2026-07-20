@@ -246,6 +246,7 @@ export default function App() {
         blocks={blocks}
         selectedBlockId={selectedBlockId}
         onSelectBlock={setSelectedBlockId}
+        onUpdateBlock={handleUpdateBlock}
         onSave={handleSaveWorkspace}
         onLoad={handleLoadWorkspace}
         onExport={handleExportFile}
