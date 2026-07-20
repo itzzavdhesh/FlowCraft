@@ -29,6 +29,7 @@ interface CenterCanvasProps {
   blocks: Block[];
   selectedBlockId: string | null;
   onSelectBlock: (id: string) => void;
+  onUpdateBlock: (updated: Block) => void;
   onSave: () => void;
   onLoad: () => void;
   onExport: (format: 'png' | 'pdf' | 'pptx') => void;
@@ -41,6 +42,7 @@ export default function CenterCanvas({
   blocks,
   selectedBlockId,
   onSelectBlock,
+  onUpdateBlock,
   onSave,
   onLoad,
   onExport,
@@ -54,6 +56,26 @@ export default function CenterCanvas({
   // Apply layout algorithm
   const nodes = calculateLayout(blocks);
   const connections = calculateConnections(nodes);
+
+  // Identify unique expanded groups and their bounding boxes
+  const expandedGroups = new Map<string, { label: string; minX: number; minY: number; maxX: number; maxY: number }>();
+  nodes.forEach(node => {
+    if (node.block.groupId && !node.block.isGroupCollapsed) {
+      const gId = node.block.groupId;
+      const current = expandedGroups.get(gId) || {
+        label: node.block.groupLabel || gId,
+        minX: Infinity,
+        minY: Infinity,
+        maxX: -Infinity,
+        maxY: -Infinity,
+      };
+      current.minX = Math.min(current.minX, node.x);
+      current.minY = Math.min(current.minY, node.y);
+      current.maxX = Math.max(current.maxX, node.x + NODE_WIDTH);
+      current.maxY = Math.max(current.maxY, node.y + NODE_HEIGHT);
+      expandedGroups.set(gId, current);
+    }
+  });
 
   // Zoom & Pan states
   const [scale, setScale] = useState(1);
@@ -462,6 +484,51 @@ export default function CenterCanvas({
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
               }}
             >
+              {/* Bounding containers for expanded groups */}
+              {Array.from(expandedGroups.entries()).map(([gId, group]) => {
+                const width = (group.maxX - group.minX) + 48;
+                const height = (group.maxY - group.minY) + 70;
+                const left = group.minX - 24;
+                const top = group.minY - 46;
+
+                return (
+                  <div
+                    key={`group-card-${gId}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${left}px`,
+                      top: `${top}px`,
+                      width: `${width}px`,
+                      height: `${height}px`,
+                      pointerEvents: 'none',
+                    }}
+                    className="border-2 border-dashed border-indigo-200 bg-indigo-50/10 rounded-2xl z-0"
+                  >
+                    <div className="absolute top-2.5 left-4 flex items-center gap-2 pointer-events-auto select-none">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-500 bg-indigo-50/80 px-2 py-0.5 rounded-md">
+                        {group.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          blocks.forEach(b => {
+                            if (b.groupId === gId) {
+                              onUpdateBlock({
+                                ...b,
+                                isGroupCollapsed: true
+                              });
+                            }
+                          });
+                        }}
+                        className="px-1.5 py-0.5 bg-white hover:bg-indigo-50 text-[9px] font-bold text-indigo-600 border border-indigo-150 rounded shadow-xs cursor-pointer transition-colors"
+                      >
+                        Collapse
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
               {/* SVG Vectors connecting elements */}
               <svg className="absolute inset-0 pointer-events-none w-full h-full z-0 overflow-visible">
                 <defs>

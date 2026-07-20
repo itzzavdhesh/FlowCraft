@@ -121,7 +121,22 @@ export default function App() {
 
   // Update node details (Right panel)
   const handleUpdateBlock = (updatedBlock: Block) => {
-    setBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
+    setBlocks((prev) => {
+      let updated = prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b));
+      if (updatedBlock.groupId) {
+        updated = updated.map((b) => {
+          if (b.groupId === updatedBlock.groupId) {
+            return {
+              ...b,
+              isGroupCollapsed: updatedBlock.isGroupCollapsed,
+              groupLabel: updatedBlock.groupLabel
+            };
+          }
+          return b;
+        });
+      }
+      return updated;
+    });
   };
 
   // Delete block
@@ -246,6 +261,7 @@ export default function App() {
         blocks={blocks}
         selectedBlockId={selectedBlockId}
         onSelectBlock={setSelectedBlockId}
+        onUpdateBlock={handleUpdateBlock}
         onSave={handleSaveWorkspace}
         onLoad={handleLoadWorkspace}
         onExport={handleExportFile}
