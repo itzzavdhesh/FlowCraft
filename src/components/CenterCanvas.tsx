@@ -35,6 +35,7 @@ interface CenterCanvasProps {
   onNewFlowchart: () => void;
   onAddFirstBlock: () => void;
   showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
+  isCollaborative?: boolean;
 }
 
 export default function CenterCanvas({
@@ -47,6 +48,7 @@ export default function CenterCanvas({
   onNewFlowchart,
   onAddFirstBlock,
   showToast,
+  isCollaborative,
 }: CenterCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -348,6 +350,12 @@ export default function CenterCanvas({
           <span className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
             Form-Flow Sandbox
             <span className="px-1.5 py-0.5 bg-indigo-50 text-[10px] text-indigo-600 rounded-md font-semibold font-mono">STABLE</span>
+            {isCollaborative && (
+              <span className="px-1.5 py-0.5 bg-emerald-50 text-[10px] text-emerald-600 rounded-md font-semibold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                COLLABORATIVE
+              </span>
+            )}
           </span>
         </div>
 
