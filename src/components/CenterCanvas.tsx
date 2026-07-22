@@ -31,7 +31,6 @@ interface CenterCanvasProps {
   onSelectBlock: (id: string) => void;
   onSave: () => void;
   onLoad: () => void;
-  onExport: (format: 'png' | 'pdf' | 'pptx') => void;
   onNewFlowchart: () => void;
   onAddFirstBlock: () => void;
   showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
@@ -43,7 +42,6 @@ export default function CenterCanvas({
   onSelectBlock,
   onSave,
   onLoad,
-  onExport,
   onNewFlowchart,
   onAddFirstBlock,
   showToast,

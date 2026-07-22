@@ -189,35 +189,6 @@ export default function App() {
     }
   };
 
-  // Triggers interactive downloadable schematic files to fulfill "Real code integrations" guidelines
-  const handleExportFile = (format: 'png' | 'pdf' | 'pptx') => {
-    showToast(`Preparing ${format.toUpperCase()} asset...`, 'info');
-
-    setTimeout(() => {
-      try {
-        const fileContent = JSON.stringify({
-          application: "FlowForge Fluent Flowchart Builder",
-          timestamp: new Date().toISOString(),
-          format: format,
-          blueprint: blocks
-        }, null, 2);
-
-        const blob = new Blob([fileContent], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `flowforge-export-${Date.now()}.${format === 'pptx' ? 'json' : format}.txt`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        showToast(`${format.toUpperCase()} export completed successfully!`, 'success');
-      } catch {
-        showToast(`Failed to export ${format.toUpperCase()}`, 'error');
-      }
-    }, 1200);
-  };
 
   const handleNewFlowchart = () => {
     setBlocks([]);
@@ -248,7 +219,6 @@ export default function App() {
         onSelectBlock={setSelectedBlockId}
         onSave={handleSaveWorkspace}
         onLoad={handleLoadWorkspace}
-        onExport={handleExportFile}
         onNewFlowchart={handleNewFlowchart}
         onAddFirstBlock={() => {
           setBlocks(initialDemoBlocks);
