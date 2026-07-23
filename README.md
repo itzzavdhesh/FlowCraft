@@ -19,6 +19,7 @@ Build beautiful, structured flowcharts by filling out a simple form — no dragg
 FlowCraft (internally called FlowForge) is an AI-assisted flowchart builder where you describe your flow using a structured form interface, and the app renders it as a clean visual diagram. It supports terminators, process blocks, and decision nodes — all wired together through a linked-list-style canvas.
 
 Key highlights:
+
 - Form-based block creation (no drag-and-drop complexity)
 - Real-time canvas rendering with connection arrows
 - Gemini AI integration for smart assistance
@@ -29,15 +30,15 @@ Key highlights:
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 19 + TypeScript |
-| Styling | Tailwind CSS v4 |
-| Build Tool | Vite |
-| AI | Google Gemini API (`@google/genai`) |
-| Animations | Motion (Framer Motion) |
-| Export | html-to-image, jsPDF, PptxGenJS |
-| Icons | Lucide React |
+| Layer      | Technology                          |
+| ---------- | ----------------------------------- |
+| Frontend   | React 19 + TypeScript               |
+| Styling    | Tailwind CSS v4                     |
+| Build Tool | Vite                                |
+| AI         | Google Gemini API (`@google/genai`) |
+| Animations | Motion (Framer Motion)              |
+| Export     | html-to-image, jsPDF, PptxGenJS     |
+| Icons      | Lucide React                        |
 
 ---
 
@@ -90,12 +91,12 @@ Open `http://localhost:3000` in your browser.
 
 ## Available Scripts
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start dev server on port 3000 |
-| `npm run build` | Production build |
-| `npm run preview` | Preview production build |
-| `npm run lint` | TypeScript type check |
+| Command           | Description                   |
+| ----------------- | ----------------------------- |
+| `npm run dev`     | Start dev server on port 3000 |
+| `npm run build`   | Production build              |
+| `npm run preview` | Preview production build      |
+| `npm run lint`    | TypeScript type check         |
 
 ---
 

@@ -18,8 +18,6 @@ PROGRAM_NAME
 
 <!-- A brief, one-line summary of the feature you are requesting. -->
 
-
-
 ---
 
 ## 🧩 Problem Statement
@@ -35,8 +33,6 @@ As a user, I find it difficult to...
 
 <!-- Describe the feature you would like to see added. Be as specific as possible —
      include UI ideas, interaction patterns, or example workflows if relevant. -->
-
-
 
 ---
 
@@ -56,8 +52,6 @@ I ruled these out because...
 
 <!-- Any other information, mockups, screenshots, or links to similar tools that
      help communicate your idea. Drag and drop images directly here. -->
-
-
 
 ---
 

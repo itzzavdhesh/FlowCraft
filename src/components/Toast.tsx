@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
-import { ToastConfig } from '../types';
+import React, { useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { CheckCircle, AlertCircle, Info, X } from "lucide-react";
+import { ToastConfig } from "../types";
 
 interface ToastProps {
   toasts: ToastConfig[];
@@ -25,7 +25,14 @@ export default function Toast({ toasts, onClose }: ToastProps) {
   );
 }
 
-function ToastItem({ toast, onClose }: { toast: ToastConfig; onClose: (id: string) => void; key?: React.Key }) {
+function ToastItem({
+  toast,
+  onClose,
+}: {
+  toast: ToastConfig;
+  onClose: (id: string) => void;
+  key?: React.Key;
+}) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose(toast.id);
@@ -40,15 +47,15 @@ function ToastItem({ toast, onClose }: { toast: ToastConfig; onClose: (id: strin
   };
 
   const bgColors = {
-    success: 'bg-emerald-50/95 border-emerald-100 shadow-emerald-100/50',
-    error: 'bg-red-50/95 border-red-100 shadow-red-100/50',
-    info: 'bg-indigo-50/95 border-indigo-100 shadow-indigo-100/50',
+    success: "bg-emerald-50/95 border-emerald-100 shadow-emerald-100/50",
+    error: "bg-red-50/95 border-red-100 shadow-red-100/50",
+    info: "bg-indigo-50/95 border-indigo-100 shadow-indigo-100/50",
   };
 
   const textColors = {
-    success: 'text-emerald-800',
-    error: 'text-red-800',
-    info: 'text-indigo-800',
+    success: "text-emerald-800",
+    error: "text-red-800",
+    info: "text-indigo-800",
   };
 
   return (
@@ -61,7 +68,9 @@ function ToastItem({ toast, onClose }: { toast: ToastConfig; onClose: (id: strin
     >
       {icons[toast.type]}
       <div className="flex-grow">
-        <p className={`text-sm font-medium ${textColors[toast.type]}`}>{toast.message}</p>
+        <p className={`text-sm font-medium ${textColors[toast.type]}`}>
+          {toast.message}
+        </p>
       </div>
       <button
         onClick={() => onClose(toast.id)}

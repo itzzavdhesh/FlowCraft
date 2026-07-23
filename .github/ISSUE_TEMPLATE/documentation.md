@@ -36,8 +36,6 @@ PROGRAM_NAME
 <!-- Describe what is currently wrong, missing, outdated, or confusing.
      Paste the exact text or link to the line/section if possible. -->
 
-
-
 ---
 
 ## ✏️ Suggested Improvement
@@ -45,16 +43,12 @@ PROGRAM_NAME
 <!-- What should the documentation say instead?
      Even a rough draft of the corrected text is very helpful. -->
 
-
-
 ---
 
 ## 📎 Additional Notes
 
 <!-- Any other context, references, or reasons this documentation matters.
      e.g. "I spent 2 hours debugging this because the docs didn't mention..." -->
-
-
 
 ---
 

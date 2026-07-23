@@ -3,15 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Zap, Edit2, Trash2, Plus, X } from 'lucide-react';
-import { ShapeType, Block } from '../types';
+import React, { useState } from "react";
+import { Zap, Edit2, Trash2, Plus, X } from "lucide-react";
+import { ShapeType, Block } from "../types";
 
 interface LeftSidebarProps {
   blocks: Block[];
   selectedBlockId: string | null;
   onSelectBlock: (id: string) => void;
-  onAddBlock: (blockData: Omit<Block, 'id'>) => void;
+  onAddBlock: (blockData: Omit<Block, "id">) => void;
   onDeleteBlock: (id: string) => void;
   activeParentId: string | null;
   onCancelActiveParent: () => void;
@@ -26,12 +26,12 @@ export default function LeftSidebar({
   activeParentId,
   onCancelActiveParent,
 }: LeftSidebarProps) {
-  const [selectedType, setSelectedType] = useState<ShapeType>('terminator');
-  const [blockLabel, setBlockLabel] = useState('');
-  
+  const [selectedType, setSelectedType] = useState<ShapeType>("terminator");
+  const [blockLabel, setBlockLabel] = useState("");
+
   // Decision specific branch labels
-  const [yesLabel, setYesLabel] = useState('Yes');
-  const [noLabel, setNoLabel] = useState('No');
+  const [yesLabel, setYesLabel] = useState("Yes");
+  const [noLabel, setNoLabel] = useState("No");
 
   const activeParentBlock = blocks.find((b) => b.id === activeParentId);
 
@@ -39,66 +39,79 @@ export default function LeftSidebar({
     e.preventDefault();
     if (!blockLabel.trim()) return;
 
-    if (selectedType === 'decision') {
+    if (selectedType === "decision") {
       onAddBlock({
         type: selectedType,
         label: blockLabel.trim(),
-        yesLabel: yesLabel.trim() || 'Yes',
-        noLabel: noLabel.trim() || 'No',
-        yesTargetId: '',
-        noTargetId: '',
+        yesLabel: yesLabel.trim() || "Yes",
+        noLabel: noLabel.trim() || "No",
+        yesTargetId: "",
+        noTargetId: "",
       });
     } else {
       onAddBlock({
         type: selectedType,
         label: blockLabel.trim(),
-        targetId: '',
+        targetId: "",
       });
     }
 
     // Reset fields
-    setBlockLabel('');
-    setYesLabel('Yes');
-    setNoLabel('No');
+    setBlockLabel("");
+    setYesLabel("Yes");
+    setNoLabel("No");
   };
 
-  const shapeCards: Array<{ type: ShapeType; name: string; desc: string; render: React.ReactNode }> = [
+  const shapeCards: Array<{
+    type: ShapeType;
+    name: string;
+    desc: string;
+    render: React.ReactNode;
+  }> = [
     {
-      type: 'terminator',
-      name: 'Terminator',
-      desc: 'Start / End',
-      render: <div className="w-10 h-5 border-2 border-current rounded-full mx-auto" />
+      type: "terminator",
+      name: "Terminator",
+      desc: "Start / End",
+      render: (
+        <div className="w-10 h-5 border-2 border-current rounded-full mx-auto" />
+      ),
     },
     {
-      type: 'process',
-      name: 'Process',
-      desc: 'Action / Step',
-      render: <div className="w-10 h-5 border-2 border-current rounded mx-auto" />
+      type: "process",
+      name: "Process",
+      desc: "Action / Step",
+      render: (
+        <div className="w-10 h-5 border-2 border-current rounded mx-auto" />
+      ),
     },
     {
-      type: 'decision',
-      name: 'Decision',
-      desc: 'Yes / No Branch',
-      render: <div className="w-5 h-5 border-2 border-current rotate-45 mx-auto my-0.5" />
+      type: "decision",
+      name: "Decision",
+      desc: "Yes / No Branch",
+      render: (
+        <div className="w-5 h-5 border-2 border-current rotate-45 mx-auto my-0.5" />
+      ),
     },
     {
-      type: 'io',
-      name: 'Input/Output',
-      desc: 'Data / IO',
-      render: <div className="w-10 h-5 border-2 border-current -skew-x-[15deg] mx-auto" />
-    }
+      type: "io",
+      name: "Input/Output",
+      desc: "Data / IO",
+      render: (
+        <div className="w-10 h-5 border-2 border-current -skew-x-[15deg] mx-auto" />
+      ),
+    },
   ];
 
   const getBadgeStyle = (type: ShapeType) => {
     switch (type) {
-      case 'terminator':
-        return 'bg-blue-50 text-blue-700 border border-blue-150 rounded-full px-2.5 py-0.5 text-[10px] font-medium tracking-wide';
-      case 'process':
-        return 'bg-indigo-50 text-indigo-700 border border-indigo-150 rounded px-2.5 py-0.5 text-[10px] font-medium tracking-wide';
-      case 'decision':
-        return 'bg-amber-50 text-amber-700 border border-amber-150 rounded-md px-2.5 py-0.5 text-[10px] font-medium tracking-wide';
-      case 'io':
-        return 'bg-emerald-50 text-emerald-700 border border-emerald-150 rounded px-2.5 py-0.5 text-[10px] font-medium tracking-wide';
+      case "terminator":
+        return "bg-blue-50 text-blue-700 border border-blue-150 rounded-full px-2.5 py-0.5 text-[10px] font-medium tracking-wide";
+      case "process":
+        return "bg-indigo-50 text-indigo-700 border border-indigo-150 rounded px-2.5 py-0.5 text-[10px] font-medium tracking-wide";
+      case "decision":
+        return "bg-amber-50 text-amber-700 border border-amber-150 rounded-md px-2.5 py-0.5 text-[10px] font-medium tracking-wide";
+      case "io":
+        return "bg-emerald-50 text-emerald-700 border border-emerald-150 rounded px-2.5 py-0.5 text-[10px] font-medium tracking-wide";
     }
   };
 
@@ -110,8 +123,15 @@ export default function LeftSidebar({
           <Zap className="w-5 h-5 text-white fill-white/10" />
         </div>
         <div>
-          <h1 id="app-logo-text" className="text-lg font-bold text-gray-900 tracking-tight">FlowCraft</h1>
-          <p className="text-[10px] font-medium text-gray-400 tracking-wide uppercase">Interactive Builder</p>
+          <h1
+            id="app-logo-text"
+            className="text-lg font-bold text-gray-900 tracking-tight"
+          >
+            FlowCraft
+          </h1>
+          <p className="text-[10px] font-medium text-gray-400 tracking-wide uppercase">
+            Interactive Builder
+          </p>
         </div>
       </div>
 
@@ -122,7 +142,10 @@ export default function LeftSidebar({
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
               <span className="text-xs font-semibold text-indigo-700 truncate">
-                Adding after: <strong className="text-indigo-900 font-bold">{activeParentBlock.label}</strong>
+                Adding after:{" "}
+                <strong className="text-indigo-900 font-bold">
+                  {activeParentBlock.label}
+                </strong>
               </span>
             </div>
             <button
@@ -138,7 +161,12 @@ export default function LeftSidebar({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <h2 id="left-sidebar-add-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Add Block</h2>
+            <h2
+              id="left-sidebar-add-title"
+              className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3"
+            >
+              Add Block
+            </h2>
             <div className="grid grid-cols-2 gap-2">
               {shapeCards.map((card) => {
                 const isSelected = selectedType === card.type;
@@ -149,16 +177,22 @@ export default function LeftSidebar({
                     onClick={() => setSelectedType(card.type)}
                     className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col justify-between h-20 group ${
                       isSelected
-                        ? 'border-indigo-600 bg-indigo-50/60 text-indigo-600 shadow-sm'
-                        : 'border-gray-200 hover:border-gray-350 hover:bg-gray-50 text-gray-500'
+                        ? "border-indigo-600 bg-indigo-50/60 text-indigo-600 shadow-sm"
+                        : "border-gray-200 hover:border-gray-350 hover:bg-gray-50 text-gray-500"
                     }`}
                   >
-                    <div className={`${isSelected ? 'text-indigo-600' : 'text-gray-400 group-hover:text-gray-600'} transition-colors`}>
+                    <div
+                      className={`${isSelected ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-600"} transition-colors`}
+                    >
                       {card.render}
                     </div>
                     <div>
-                      <div className="text-[11px] font-bold tracking-tight">{card.name}</div>
-                      <div className="text-[9px] text-gray-400">{card.desc}</div>
+                      <div className="text-[11px] font-bold tracking-tight">
+                        {card.name}
+                      </div>
+                      <div className="text-[9px] text-gray-400">
+                        {card.desc}
+                      </div>
                     </div>
                   </button>
                 );
@@ -168,7 +202,12 @@ export default function LeftSidebar({
 
           <div className="space-y-3">
             <div>
-              <label htmlFor="block-label-input" className="block text-xs font-bold text-gray-700 mb-1.5">Block Label</label>
+              <label
+                htmlFor="block-label-input"
+                className="block text-xs font-bold text-gray-700 mb-1.5"
+              >
+                Block Label
+              </label>
               <input
                 id="block-label-input"
                 type="text"
@@ -179,10 +218,15 @@ export default function LeftSidebar({
               />
             </div>
 
-            {selectedType === 'decision' && (
+            {selectedType === "decision" && (
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <div>
-                  <label htmlFor="yes-label-input" className="block text-[10px] font-bold text-gray-600 mb-1">Yes Label</label>
+                  <label
+                    htmlFor="yes-label-input"
+                    className="block text-[10px] font-bold text-gray-600 mb-1"
+                  >
+                    Yes Label
+                  </label>
                   <input
                     id="yes-label-input"
                     type="text"
@@ -193,7 +237,12 @@ export default function LeftSidebar({
                   />
                 </div>
                 <div>
-                  <label htmlFor="no-label-input" className="block text-[10px] font-bold text-gray-600 mb-1">No Label</label>
+                  <label
+                    htmlFor="no-label-input"
+                    className="block text-[10px] font-bold text-gray-600 mb-1"
+                  >
+                    No Label
+                  </label>
                   <input
                     id="no-label-input"
                     type="text"
@@ -219,11 +268,18 @@ export default function LeftSidebar({
         </form>
 
         <div className="border-t border-gray-100 pt-5">
-          <h2 id="left-sidebar-list-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 block">Blocks</h2>
-          
+          <h2
+            id="left-sidebar-list-title"
+            className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 block"
+          >
+            Blocks
+          </h2>
+
           {blocks.length === 0 ? (
             <div className="text-center py-6 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-              <p className="text-[11px] text-gray-400 font-medium">No blocks yet</p>
+              <p className="text-[11px] text-gray-400 font-medium">
+                No blocks yet
+              </p>
             </div>
           ) : (
             <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
@@ -234,8 +290,8 @@ export default function LeftSidebar({
                     key={block.id}
                     className={`group flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
                       isSelected
-                        ? 'border-indigo-200 bg-indigo-50/30'
-                        : 'border-gray-150 hover:border-gray-300 bg-white hover:bg-gray-50/50'
+                        ? "border-indigo-200 bg-indigo-50/30"
+                        : "border-gray-150 hover:border-gray-300 bg-white hover:bg-gray-50/50"
                     }`}
                     onClick={() => onSelectBlock(block.id)}
                   >

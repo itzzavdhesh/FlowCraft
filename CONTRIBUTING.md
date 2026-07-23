@@ -64,6 +64,7 @@ Pull requests are validated only when the PR author matches the assignee on the 
 After a pull request is merged, the PR is marked `merged` and `completed`. Linked closing issues receive `completed` and `closed-by-pr`.
 
 Maintainers use decision labels after reviewing issues:
+
 - `go ahead` — issue is valid for assigned work
 - `stale-assignment` — clears current assignee and reopens the queue
 - `duplicate`, `not needed`, `out of scope` — closes the issue automatically

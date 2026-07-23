@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Block, CanvasNode } from '../types';
+import { Block, CanvasNode } from "../types";
 
 export const NODE_WIDTH = 180;
 export const NODE_HEIGHT = 72;
@@ -11,7 +11,6 @@ export const COLUMN_WIDTH = 200;
 export const ROW_HEIGHT = 150;
 export const DIAMOND_SIZE = 92;
 export const DIAMOND_HALF_DIAG = 65;
-
 
 /**
  * Automatically calculates visual X and Y layout coordinates for a list of blocks.
@@ -23,7 +22,7 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
   // 1. Identify roots and parents for each block
   const incomingMap = new Map<string, number>();
   const parentsMap = new Map<string, string[]>();
-  
+
   blocks.forEach((b) => {
     incomingMap.set(b.id, 0);
     parentsMap.set(b.id, []);
@@ -35,9 +34,12 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
         parentsMap.get(childId)!.push(parentId);
       }
     };
-    if (b.type === 'decision') {
+    if (b.type === "decision") {
       if (b.yesTargetId && b.yesTargetId !== b.id) {
-        incomingMap.set(b.yesTargetId, (incomingMap.get(b.yesTargetId) || 0) + 1);
+        incomingMap.set(
+          b.yesTargetId,
+          (incomingMap.get(b.yesTargetId) || 0) + 1,
+        );
         addParent(b.yesTargetId, b.id);
       }
       if (b.noTargetId && b.noTargetId !== b.id) {
@@ -55,7 +57,7 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
   // Find a good starting node (root with 0 incoming, or terminator, or just first node)
   let rootId = blocks[0].id;
   let minIncoming = Infinity;
-  
+
   // Prefer a root with 0 incoming edges
   for (const b of blocks) {
     const inc = incomingMap.get(b.id) || 0;
@@ -71,7 +73,7 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
 
   const layoutMap = new Map<string, { row: number; col: number }>();
   const occupied = new Set<string>();
-  const pending = new Set<string>(blocks.map(b => b.id));
+  const pending = new Set<string>(blocks.map((b) => b.id));
 
   let iterations = 0;
   const maxIterations = blocks.length * 10; // safety ceiling
@@ -83,7 +85,7 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
     for (const bId of pending) {
       const parents = parentsMap.get(bId) || [];
       // Check if all parents are already placed
-      const allParentsPlaced = parents.every(pId => layoutMap.has(pId));
+      const allParentsPlaced = parents.every((pId) => layoutMap.has(pId));
 
       if (allParentsPlaced && (parents.length > 0 || bId === rootId)) {
         placeBlock(bId, parents);
@@ -99,7 +101,10 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
       const firstBId = Array.from(pending)[0];
       if (firstBId) {
         const parents = parentsMap.get(firstBId) || [];
-        placeBlock(firstBId, parents.filter(pId => layoutMap.has(pId)));
+        placeBlock(
+          firstBId,
+          parents.filter((pId) => layoutMap.has(pId)),
+        );
         pending.delete(firstBId);
       }
     }
@@ -119,7 +124,7 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
 
   // Helper function to place an individual block
   function placeBlock(id: string, placedParents: string[]) {
-    const block = blocks.find(b => b.id === id);
+    const block = blocks.find((b) => b.id === id);
     if (!block) return;
 
     let row = 0;
@@ -134,9 +139,9 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
     } else if (placedParents.length === 1) {
       const pId = placedParents[0];
       const parentCoord = layoutMap.get(pId)!;
-      const parentBlock = blocks.find(b => b.id === pId);
-      
-      if (parentBlock?.type === 'decision') {
+      const parentBlock = blocks.find((b) => b.id === pId);
+
+      if (parentBlock?.type === "decision") {
         if (parentBlock.yesTargetId === id) {
           // YES BRANCH: Placed to the BOTTOM-RIGHT of the diamond
           // Same X position as center + 200px (right column), Y below diamond (+150px)
@@ -164,10 +169,10 @@ export function calculateLayout(blocks: Block[]): CanvasNode[] {
       }
     } else if (placedParents.length > 1) {
       // REJOINING NODE: row is strictly max row of ALL parents + 1
-      const parentCoords = placedParents.map(pId => layoutMap.get(pId)!);
-      const maxParentRow = Math.max(...parentCoords.map(c => c.row));
+      const parentCoords = placedParents.map((pId) => layoutMap.get(pId)!);
+      const maxParentRow = Math.max(...parentCoords.map((c) => c.row));
       row = maxParentRow + 1;
-      
+
       // col is the average of parent columns (CENTER)
       const sumCols = parentCoords.reduce((sum, c) => sum + c.col, 0);
       col = Math.round(sumCols / parentCoords.length);
@@ -213,7 +218,7 @@ export interface SvgLine {
   labelX: number;
   labelY: number;
   isUnconnected?: boolean;
-  unconnectedDir?: 'right' | 'down';
+  unconnectedDir?: "right" | "down";
   startX?: number;
   startY?: number;
   endX?: number;
@@ -233,7 +238,7 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
     nodes.forEach((src) => {
       const b = src.block;
       const targetsTgt = (tgtId: string) => tgtId === targetCandidate.block.id;
-      if (b.type === 'decision') {
+      if (b.type === "decision") {
         if (b.yesTargetId && targetsTgt(b.yesTargetId)) incomingCount++;
         if (b.noTargetId && targetsTgt(b.noTargetId)) incomingCount++;
       } else {
@@ -248,7 +253,7 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
   nodes.forEach((source) => {
     const block = source.block;
 
-    if (block.type === 'decision') {
+    if (block.type === "decision") {
       const sourceCx = source.x + NODE_WIDTH / 2;
       const sourceCy = source.y + NODE_HEIGHT / 2;
 
@@ -256,7 +261,15 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
       if (block.yesTargetId && block.yesTargetId !== block.id) {
         const target = nodes.find((n) => n.block.id === block.yesTargetId);
         if (target) {
-          lines.push(generateConnection(source, target, block.yesLabel || 'Yes', 'yes', sharedTargets.has(target.block.id)));
+          lines.push(
+            generateConnection(
+              source,
+              target,
+              block.yesLabel || "Yes",
+              "yes",
+              sharedTargets.has(target.block.id),
+            ),
+          );
         } else {
           // If the target is set but somehow not in the nodes, treat as unconnected
           const startX = sourceCx + DIAMOND_HALF_DIAG;
@@ -267,11 +280,11 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
             id: `${source.block.id}-unconnected-yes`,
             sourceId: source.block.id,
             path: `M ${startX} ${startY} L ${endX} ${endY}`,
-            label: block.yesLabel || 'Yes',
+            label: block.yesLabel || "Yes",
             labelX: startX + 25,
             labelY: startY - 14,
             isUnconnected: true,
-            unconnectedDir: 'right',
+            unconnectedDir: "right",
             endX,
             endY,
           });
@@ -286,11 +299,11 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
           id: `${source.block.id}-unconnected-yes`,
           sourceId: source.block.id,
           path: `M ${startX} ${startY} L ${endX} ${endY}`,
-          label: block.yesLabel || 'Yes',
+          label: block.yesLabel || "Yes",
           labelX: startX + 25,
           labelY: startY - 14,
           isUnconnected: true,
-          unconnectedDir: 'right',
+          unconnectedDir: "right",
           endX,
           endY,
         });
@@ -300,7 +313,15 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
       if (block.noTargetId && block.noTargetId !== block.id) {
         const target = nodes.find((n) => n.block.id === block.noTargetId);
         if (target) {
-          lines.push(generateConnection(source, target, block.noLabel || 'No', 'no', sharedTargets.has(target.block.id)));
+          lines.push(
+            generateConnection(
+              source,
+              target,
+              block.noLabel || "No",
+              "no",
+              sharedTargets.has(target.block.id),
+            ),
+          );
         } else {
           // If the target is set but somehow not in the nodes, treat as unconnected
           const startX = sourceCx - DIAMOND_HALF_DIAG;
@@ -311,11 +332,11 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
             id: `${source.block.id}-unconnected-no`,
             sourceId: source.block.id,
             path: `M ${startX} ${startY} L ${endX} ${endY}`,
-            label: block.noLabel || 'No',
+            label: block.noLabel || "No",
             labelX: startX - 25,
             labelY: startY - 14,
             isUnconnected: true,
-            unconnectedDir: 'right',
+            unconnectedDir: "right",
             endX,
             endY,
           });
@@ -330,11 +351,11 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
           id: `${source.block.id}-unconnected-no`,
           sourceId: source.block.id,
           path: `M ${startX} ${startY} L ${endX} ${endY}`,
-          label: block.noLabel || 'No',
+          label: block.noLabel || "No",
           labelX: startX - 25,
           labelY: startY - 14,
           isUnconnected: true,
-          unconnectedDir: 'right',
+          unconnectedDir: "right",
           endX,
           endY,
         });
@@ -344,7 +365,15 @@ export function calculateConnections(nodes: CanvasNode[]): SvgLine[] {
       if (block.targetId && block.targetId !== block.id) {
         const target = nodes.find((n) => n.block.id === block.targetId);
         if (target) {
-          lines.push(generateConnection(source, target, undefined, 'standard', sharedTargets.has(target.block.id)));
+          lines.push(
+            generateConnection(
+              source,
+              target,
+              undefined,
+              "standard",
+              sharedTargets.has(target.block.id),
+            ),
+          );
         }
       }
     }
@@ -357,11 +386,11 @@ function generateConnection(
   source: CanvasNode,
   target: CanvasNode,
   label: string | undefined,
-  connectionType: 'yes' | 'no' | 'standard',
-  isSharedTarget: boolean = false
+  connectionType: "yes" | "no" | "standard",
+  isSharedTarget: boolean = false,
 ): SvgLine {
-  const isSourceDecision = source.block.type === 'decision';
-  const isTargetDecision = target.block.type === 'decision';
+  const isSourceDecision = source.block.type === "decision";
+  const isTargetDecision = target.block.type === "decision";
 
   const sourceCx = source.x + NODE_WIDTH / 2;
   const sourceCy = source.y + NODE_HEIGHT / 2;
@@ -372,7 +401,7 @@ function generateConnection(
   let startY = source.y + NODE_HEIGHT;
 
   if (isSourceDecision) {
-    if (connectionType === 'yes') {
+    if (connectionType === "yes") {
       startX = sourceCx + DIAMOND_HALF_DIAG;
       startY = sourceCy;
     } else {
@@ -400,7 +429,7 @@ function generateConnection(
     endY = targetCy - DIAMOND_HALF_DIAG;
   }
 
-  let path = '';
+  let path = "";
   let labelX = (startX + endX) / 2;
   let labelY = (startY + endY) / 2;
 
@@ -410,8 +439,8 @@ function generateConnection(
       // Exits horizontally, drops down along the middle corridor, and enters horizontally into the side.
       const midX = (sourceCx + targetCx) / 2;
       path = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
-      
-      if (connectionType === 'yes') {
+
+      if (connectionType === "yes") {
         labelX = startX + 25;
         labelY = startY - 10;
       } else {
@@ -422,8 +451,8 @@ function generateConnection(
       // Decision node to a non-shared target (or same column):
       // Exits horizontally, then drops down vertically to target top.
       path = `M ${startX} ${startY} L ${endX} ${startY} L ${endX} ${endY}`;
-      
-      if (connectionType === 'yes') {
+
+      if (connectionType === "yes") {
         labelX = startX + 25;
         labelY = startY - 10;
       } else {

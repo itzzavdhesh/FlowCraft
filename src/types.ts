@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type ShapeType = 'terminator' | 'process' | 'decision' | 'io';
+export type ShapeType = "terminator" | "process" | "decision" | "io";
 
 export interface Block {
   id: string;
@@ -11,9 +11,9 @@ export interface Block {
   label: string;
   targetId?: string; // For standard nodes (terminator, process, io)
   yesLabel?: string; // For decision nodes
-  noLabel?: string;  // For decision nodes
+  noLabel?: string; // For decision nodes
   yesTargetId?: string; // Target for "Yes" branch
-  noTargetId?: string;  // Target for "No" branch
+  noTargetId?: string; // Target for "No" branch
 }
 
 export interface CanvasNode {
@@ -27,5 +27,5 @@ export interface CanvasNode {
 export interface ToastConfig {
   id: string;
   message: string;
-  type: 'success' | 'info' | 'error';
+  type: "success" | "info" | "error";
 }

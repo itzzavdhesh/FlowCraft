@@ -3,63 +3,68 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import LeftSidebar from './components/LeftSidebar';
-import CenterCanvas from './components/CenterCanvas';
-import RightSidebar from './components/RightSidebar';
-import Toast from './components/Toast';
-import { Block, ToastConfig } from './types';
+import React, { useState, useEffect } from "react";
+import LeftSidebar from "./components/LeftSidebar";
+import CenterCanvas from "./components/CenterCanvas";
+import RightSidebar from "./components/RightSidebar";
+import Toast from "./components/Toast";
+import { Block, ToastConfig } from "./types";
 
 // Default blueprint layout tracking
 const initialDemoBlocks: Block[] = [
   {
-    id: 'demo-1',
-    type: 'terminator',
-    label: 'Start',
-    targetId: 'demo-2',
+    id: "demo-1",
+    type: "terminator",
+    label: "Start",
+    targetId: "demo-2",
   },
   {
-    id: 'demo-2',
-    type: 'process',
-    label: 'Validate Input',
-    targetId: 'demo-3',
+    id: "demo-2",
+    type: "process",
+    label: "Validate Input",
+    targetId: "demo-3",
   },
   {
-    id: 'demo-3',
-    type: 'decision',
-    label: 'Is Valid?',
-    yesLabel: 'Yes',
-    noLabel: 'No',
-    yesTargetId: 'demo-4',
-    noTargetId: 'demo-5',
+    id: "demo-3",
+    type: "decision",
+    label: "Is Valid?",
+    yesLabel: "Yes",
+    noLabel: "No",
+    yesTargetId: "demo-4",
+    noTargetId: "demo-5",
   },
   {
-    id: 'demo-4',
-    type: 'process',
-    label: 'Allow Access',
-    targetId: 'demo-6',
+    id: "demo-4",
+    type: "process",
+    label: "Allow Access",
+    targetId: "demo-6",
   },
   {
-    id: 'demo-5',
-    type: 'process',
-    label: 'Reject Request',
-    targetId: 'demo-6',
+    id: "demo-5",
+    type: "process",
+    label: "Reject Request",
+    targetId: "demo-6",
   },
   {
-    id: 'demo-6',
-    type: 'terminator',
-    label: 'End',
+    id: "demo-6",
+    type: "terminator",
+    label: "End",
   },
 ];
 
 export default function App() {
   const [blocks, setBlocks] = useState<Block[]>(initialDemoBlocks);
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>('demo-1');
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(
+    "demo-1",
+  );
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastConfig[]>([]);
 
   // Function to push a toast
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+  const showToast = (
+    message: string,
+    type: "success" | "info" | "error" = "success",
+  ) => {
     const newToast: ToastConfig = {
       id: Math.random().toString(36).substring(2, 9),
       message,
@@ -73,7 +78,7 @@ export default function App() {
   };
 
   // Add block from form (Left panel)
-  const handleAddBlock = (blockData: Omit<Block, 'id'>) => {
+  const handleAddBlock = (blockData: Omit<Block, "id">) => {
     const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
 
     setBlocks((prev) => {
@@ -84,7 +89,7 @@ export default function App() {
         const activeIdx = updated.findIndex((b) => b.id === activeParentId);
         if (activeIdx !== -1) {
           const activeBlock = updated[activeIdx];
-          if (activeBlock.type === 'decision') {
+          if (activeBlock.type === "decision") {
             if (!activeBlock.yesTargetId) {
               updated[activeIdx] = { ...activeBlock, yesTargetId: newId };
             } else if (!activeBlock.noTargetId) {
@@ -121,7 +126,9 @@ export default function App() {
 
   // Update node details (Right panel)
   const handleUpdateBlock = (updatedBlock: Block) => {
-    setBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
+    setBlocks((prev) =>
+      prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)),
+    );
   };
 
   // Delete block
@@ -136,9 +143,9 @@ export default function App() {
       // Clean up references to this deleted block from other blocks
       return updated.map((b) => {
         const next = { ...b };
-        if (next.targetId === id) next.targetId = '';
-        if (next.yesTargetId === id) next.yesTargetId = '';
-        if (next.noTargetId === id) next.noTargetId = '';
+        if (next.targetId === id) next.targetId = "";
+        if (next.yesTargetId === id) next.yesTargetId = "";
+        if (next.noTargetId === id) next.noTargetId = "";
         return next;
       });
     });
@@ -149,52 +156,51 @@ export default function App() {
     if (activeParentId === id) {
       setActiveParentId(null);
     }
-    showToast(`Block "${block.label}" removed`, 'info');
+    showToast(`Block "${block.label}" removed`, "info");
   };
 
   // Select and chain next process block
   const handleSelectAndContinue = (parentBlock: Block) => {
     setActiveParentId(parentBlock.id);
-    showToast(`Adding after: ${parentBlock.label}`, 'success');
+    showToast(`Adding after: ${parentBlock.label}`, "success");
   };
 
   // Persistent Local Storage hooks
   const handleSaveWorkspace = () => {
     try {
-      localStorage.setItem('flowforge_save', JSON.stringify(blocks));
-      showToast('Flowchart saved!', 'success');
+      localStorage.setItem("flowforge_save", JSON.stringify(blocks));
+      showToast("Flowchart saved!", "success");
     } catch {
-      showToast('Could not save flowchart', 'error');
+      showToast("Could not save flowchart", "error");
     }
   };
 
   const handleLoadWorkspace = () => {
     try {
-      const data = localStorage.getItem('flowforge_save');
+      const data = localStorage.getItem("flowforge_save");
       if (data) {
         const parsed = JSON.parse(data) as Block[];
         if (parsed && Array.isArray(parsed) && parsed.length > 0) {
           setBlocks(parsed);
           setSelectedBlockId(parsed[0].id);
           setActiveParentId(null);
-          showToast('Flowchart loaded!', 'success');
+          showToast("Flowchart loaded!", "success");
         } else {
-          showToast('No saved flowchart found.', 'error');
+          showToast("No saved flowchart found.", "error");
         }
       } else {
-        showToast('No saved flowchart found.', 'info');
+        showToast("No saved flowchart found.", "info");
       }
     } catch {
-      showToast('No saved flowchart found.', 'error');
+      showToast("No saved flowchart found.", "error");
     }
   };
-
 
   const handleNewFlowchart = () => {
     setBlocks([]);
     setSelectedBlockId(null);
     setActiveParentId(null);
-    showToast('Flowchart cleared. Canvas is ready!', 'info');
+    showToast("Flowchart cleared. Canvas is ready!", "info");
   };
 
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null;
@@ -222,8 +228,8 @@ export default function App() {
         onNewFlowchart={handleNewFlowchart}
         onAddFirstBlock={() => {
           setBlocks(initialDemoBlocks);
-          setSelectedBlockId('demo-1');
-          showToast('Loaded vertical flow template!');
+          setSelectedBlockId("demo-1");
+          showToast("Loaded vertical flow template!");
         }}
         showToast={showToast}
       />

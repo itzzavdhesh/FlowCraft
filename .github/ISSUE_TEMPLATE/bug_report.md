@@ -18,17 +18,15 @@ PROGRAM_NAME
 
 <!-- A clear and concise description of what the bug is. -->
 
-
-
 ---
 
 ## 🔄 Steps to Reproduce
 
 <!-- Step-by-step instructions so maintainers can reliably reproduce the issue. -->
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ---
 
@@ -36,23 +34,17 @@ PROGRAM_NAME
 
 <!-- What did you expect to happen? -->
 
-
-
 ---
 
 ## ❌ Actual Behavior
 
 <!-- What actually happened instead? -->
 
-
-
 ---
 
 ## 📷 Screenshots
 
 <!-- If applicable, drag and drop screenshots or a screen recording here. Delete this section if not needed. -->
-
-
 
 ---
 
@@ -67,8 +59,6 @@ PROGRAM_NAME
 ## 📋 Additional Context
 
 <!-- Any other information that might help reproduce or understand the bug. -->
-
-
 
 ---
 

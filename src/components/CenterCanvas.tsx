@@ -3,27 +3,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useState } from 'react';
-import { 
-  Play, 
-  Save, 
-  FolderOpen, 
-  FileImage, 
-  FileText, 
-  Presentation, 
+import React, { useRef, useState } from "react";
+import {
+  Play,
+  Save,
+  FolderOpen,
+  FileImage,
+  FileText,
+  Presentation,
   Sparkles,
   MousePointer,
   HelpCircle,
   Database,
   ZoomIn,
   ZoomOut,
-  FilePlus
-} from 'lucide-react';
-import { toPng } from 'html-to-image';
-import { jsPDF } from 'jspdf';
-import pptxgen from 'pptxgenjs';
-import { Block, CanvasNode } from '../types';
-import { calculateLayout, calculateConnections, NODE_WIDTH, NODE_HEIGHT, DIAMOND_SIZE } from '../utils/layout';
+  FilePlus,
+} from "lucide-react";
+import { toPng } from "html-to-image";
+import { jsPDF } from "jspdf";
+import pptxgen from "pptxgenjs";
+import { Block, CanvasNode } from "../types";
+import {
+  calculateLayout,
+  calculateConnections,
+  NODE_WIDTH,
+  NODE_HEIGHT,
+  DIAMOND_SIZE,
+} from "../utils/layout";
 
 interface CenterCanvasProps {
   blocks: Block[];
@@ -33,7 +39,7 @@ interface CenterCanvasProps {
   onLoad: () => void;
   onNewFlowchart: () => void;
   onAddFirstBlock: () => void;
-  showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
+  showToast?: (message: string, type?: "success" | "info" | "error") => void;
 }
 
 export default function CenterCanvas({
@@ -68,9 +74,9 @@ export default function CenterCanvas({
     const target = e.target as HTMLElement;
     // Do not initiate pan on interactive child elements
     if (
-      target.closest('[id^="flow-node"]') || 
-      target.closest('button') || 
-      target.closest('.zoom-controls')
+      target.closest('[id^="flow-node"]') ||
+      target.closest("button") ||
+      target.closest(".zoom-controls")
     ) {
       return;
     }
@@ -114,9 +120,9 @@ export default function CenterCanvas({
       });
     };
 
-    container.addEventListener('wheel', onWheel, { passive: false });
+    container.addEventListener("wheel", onWheel, { passive: false });
     return () => {
-      container.removeEventListener('wheel', onWheel);
+      container.removeEventListener("wheel", onWheel);
     };
   }, []);
 
@@ -126,7 +132,7 @@ export default function CenterCanvas({
   const minHeight = 1000;
   let maxWidth = minWidth;
   let maxHeight = minHeight;
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     maxWidth = Math.max(maxWidth, node.x + NODE_WIDTH + 250);
     maxHeight = Math.max(maxHeight, node.y + NODE_HEIGHT + 250);
   });
@@ -134,41 +140,41 @@ export default function CenterCanvas({
   const handleExportPNG = async () => {
     if (!canvasRef.current) return;
     try {
-      showToast?.('Generating PNG...', 'info');
+      showToast?.("Generating PNG...", "info");
       const dataUrl = await toPng(canvasRef.current, {
-        backgroundColor: '#f8f9fa',
+        backgroundColor: "#f8f9fa",
         style: {
-          transform: 'translate(0px, 0px) scale(1)',
+          transform: "translate(0px, 0px) scale(1)",
         },
         cacheBust: true,
       });
-      const link = document.createElement('a');
-      link.download = 'flowforge-chart.png';
+      const link = document.createElement("a");
+      link.download = "flowforge-chart.png";
       link.href = dataUrl;
       link.click();
-      showToast?.('Flowchart saved as PNG!', 'success');
+      showToast?.("Flowchart saved as PNG!", "success");
     } catch (error) {
-      console.error('Error generating PNG:', error);
-      showToast?.('Failed to capture PNG.', 'error');
+      console.error("Error generating PNG:", error);
+      showToast?.("Failed to capture PNG.", "error");
     }
   };
 
   const handleExportPDF = async () => {
     if (!canvasRef.current) return;
     try {
-      showToast?.('Generating PDF...', 'info');
+      showToast?.("Generating PDF...", "info");
       const dataUrl = await toPng(canvasRef.current, {
-        backgroundColor: '#f8f9fa',
+        backgroundColor: "#f8f9fa",
         style: {
-          transform: 'translate(0px, 0px) scale(1)',
+          transform: "translate(0px, 0px) scale(1)",
         },
         cacheBust: true,
       });
 
       const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'px',
-        format: 'a4',
+        orientation: "landscape",
+        unit: "px",
+        format: "a4",
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -184,50 +190,60 @@ export default function CenterCanvas({
       const x = (pdfWidth - width) / 2;
       const y = (pdfHeight - height) / 2;
 
-      pdf.addImage(dataUrl, 'PNG', x, y, width, height);
-      pdf.save('flowforge-chart.pdf');
-      showToast?.('Flowchart saved as PDF!', 'success');
+      pdf.addImage(dataUrl, "PNG", x, y, width, height);
+      pdf.save("flowforge-chart.pdf");
+      showToast?.("Flowchart saved as PDF!", "success");
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      showToast?.('Failed to capture PDF.', 'error');
+      console.error("Error generating PDF:", error);
+      showToast?.("Failed to capture PDF.", "error");
     }
   };
 
   const handleExportPPTX = async () => {
     try {
-      showToast?.('Generating PPTX...', 'info');
+      showToast?.("Generating PPTX...", "info");
       const pres = new pptxgen();
 
       // Custom dimensions: convert pixels to inches for slide size
       const slideWidth = Math.max(10, maxWidth / 96);
       const slideHeight = Math.max(5.625, maxHeight / 96);
 
-      pres.defineLayout({ name: 'FLOW_LAYOUT', width: slideWidth, height: slideHeight });
-      pres.layout = 'FLOW_LAYOUT';
+      pres.defineLayout({
+        name: "FLOW_LAYOUT",
+        width: slideWidth,
+        height: slideHeight,
+      });
+      pres.layout = "FLOW_LAYOUT";
 
       const slide = pres.addSlide();
-      slide.background = { color: 'F8F9FA' };
+      slide.background = { color: "F8F9FA" };
 
       // 1. Draw connections/edges first (rendered below nodes)
       connections.forEach((c) => {
-        const sourceNode = nodes.find(n => n.block.id === c.sourceId);
-        const targetNode = nodes.find(n => n.block.id === c.targetId);
+        const sourceNode = nodes.find((n) => n.block.id === c.sourceId);
+        const targetNode = nodes.find((n) => n.block.id === c.targetId);
         if (!sourceNode || !targetNode) return;
 
         // Use exact edge start and end points calculated in layout.ts or default to node centers
-        const x1 = (c.startX !== undefined ? c.startX : (sourceNode.x + NODE_WIDTH / 2)) / 96;
-        const y1 = (c.startY !== undefined ? c.startY : (sourceNode.y + NODE_HEIGHT / 2)) / 96;
-        const x2 = (c.endX !== undefined ? c.endX : (targetNode.x + NODE_WIDTH / 2)) / 96;
-        const y2 = (c.endY !== undefined ? c.endY : (targetNode.y + NODE_HEIGHT / 2)) / 96;
+        const x1 =
+          (c.startX !== undefined ? c.startX : sourceNode.x + NODE_WIDTH / 2) /
+          96;
+        const y1 =
+          (c.startY !== undefined ? c.startY : sourceNode.y + NODE_HEIGHT / 2) /
+          96;
+        const x2 =
+          (c.endX !== undefined ? c.endX : targetNode.x + NODE_WIDTH / 2) / 96;
+        const y2 =
+          (c.endY !== undefined ? c.endY : targetNode.y + NODE_HEIGHT / 2) / 96;
 
         const lx = Math.min(x1, x2);
         const ly = Math.min(y1, y2);
         const lw = Math.abs(x2 - x1);
         const lh = Math.abs(y2 - y1);
 
-        const shapeIsFlipped = (x2 < x1) !== (y2 < y1);
-        const beginArrow = shapeIsFlipped ? 'triangle' : 'none';
-        const endArrow = shapeIsFlipped ? 'none' : 'triangle';
+        const shapeIsFlipped = x2 < x1 !== y2 < y1;
+        const beginArrow = shapeIsFlipped ? "triangle" : "none";
+        const endArrow = shapeIsFlipped ? "none" : "triangle";
 
         const lineOptions: any = {
           x: lx,
@@ -237,13 +253,13 @@ export default function CenterCanvas({
           beginArrowType: beginArrow,
           endArrowType: endArrow,
           line: {
-            color: '6366F1',
+            color: "6366F1",
             width: 2,
             beginArrowType: beginArrow,
             endArrowType: endArrow,
-            line_end: { type: 'arrow', size: 2 }
+            line_end: { type: "arrow", size: 2 },
           },
-          line_end: { type: 'arrow', size: 2 }
+          line_end: { type: "arrow", size: 2 },
         };
 
         if (x2 < x1) lineOptions.flipH = true;
@@ -260,14 +276,14 @@ export default function CenterCanvas({
             y: lYIn - 0.15,
             w: 0.6,
             h: 0.3,
-            align: 'center',
-            valign: 'middle',
+            align: "center",
+            valign: "middle",
             fontSize: 8,
-            color: '4F46E5',
-            fill: { color: 'FFFFFF' },
-            line: { color: 'E2E8F0', width: 1 },
+            color: "4F46E5",
+            fill: { color: "FFFFFF" },
+            line: { color: "E2E8F0", width: 1 },
             bold: true,
-            fontFace: 'Arial'
+            fontFace: "Arial",
           });
         }
       });
@@ -280,56 +296,57 @@ export default function CenterCanvas({
         const hIn = NODE_HEIGHT / 96;
 
         let shapeType = pres.ShapeType.rect;
-        if (node.block.type === 'terminator') {
+        if (node.block.type === "terminator") {
           shapeType = pres.ShapeType.ellipse;
-        } else if (node.block.type === 'process') {
+        } else if (node.block.type === "process") {
           shapeType = pres.ShapeType.rect;
-        } else if (node.block.type === 'decision') {
+        } else if (node.block.type === "decision") {
           shapeType = pres.ShapeType.diamond;
-        } else if (node.block.type === 'io') {
+        } else if (node.block.type === "io") {
           shapeType = pres.ShapeType.parallelogram;
         }
 
-        slide.addText(node.block.label || '', {
+        slide.addText(node.block.label || "", {
           shape: shapeType,
           x: xIn,
           y: yIn,
           w: wIn,
           h: hIn,
-          fill: { color: 'FFFFFF' },
-          line: { color: '4f46e5', width: 2 },
-          color: '1E1B4B',
+          fill: { color: "FFFFFF" },
+          line: { color: "4f46e5", width: 2 },
+          color: "1E1B4B",
           fontSize: 10,
           bold: true,
-          align: 'center',
-          valign: 'middle',
-          fontFace: 'Arial'
+          align: "center",
+          valign: "middle",
+          fontFace: "Arial",
         });
       });
 
-      await pres.writeFile({ fileName: 'flowforge-chart.pptx' });
-      showToast?.('Flowchart saved as PPTX!', 'success');
+      await pres.writeFile({ fileName: "flowforge-chart.pptx" });
+      showToast?.("Flowchart saved as PPTX!", "success");
     } catch (error) {
-      console.error('Error generating PPTX:', error);
-      showToast?.('Failed to export PPTX.', 'error');
+      console.error("Error generating PPTX:", error);
+      showToast?.("Failed to export PPTX.", "error");
     }
   };
 
   const getShapeStyle = (type: string, isSelected: boolean) => {
-    const baseClass = "absolute transition-all duration-250 cursor-pointer flex items-center justify-center border-2 shadow-md ";
-    const selectedClass = isSelected 
+    const baseClass =
+      "absolute transition-all duration-250 cursor-pointer flex items-center justify-center border-2 shadow-md ";
+    const selectedClass = isSelected
       ? "border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 shadow-lg scale-102"
       : "border-indigo-500 hover:border-indigo-650 hover:shadow-lg hover:scale-101";
 
     switch (type) {
-      case 'terminator':
+      case "terminator":
         return `${baseClass} ${selectedClass} rounded-full bg-white text-indigo-900`;
-      case 'process':
+      case "process":
         return `${baseClass} ${selectedClass} rounded-xl bg-white text-indigo-950`;
-      case 'decision':
+      case "decision":
         // A rotated square needs specific sizing and text handling
         return `${baseClass} ${selectedClass} bg-white text-indigo-950`;
-      case 'io':
+      case "io":
         return `${baseClass} ${selectedClass} bg-white text-indigo-950`;
       default:
         return `${baseClass} ${selectedClass} bg-white text-indigo-950`;
@@ -341,11 +358,15 @@ export default function CenterCanvas({
       {/* Top Toolbar */}
       <header className="h-[64px] bg-white border-b border-gray-100 shadow-xs px-6 flex items-center justify-between shrink-0 select-none z-10">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Workspace</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+            Workspace
+          </span>
           <span className="text-gray-300">/</span>
           <span className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
             Form-Flow Sandbox
-            <span className="px-1.5 py-0.5 bg-indigo-50 text-[10px] text-indigo-600 rounded-md font-semibold font-mono">STABLE</span>
+            <span className="px-1.5 py-0.5 bg-indigo-50 text-[10px] text-indigo-600 rounded-md font-semibold font-mono">
+              STABLE
+            </span>
           </span>
         </div>
 
@@ -359,7 +380,7 @@ export default function CenterCanvas({
             <Save className="w-3.5 h-3.5" />
             Save
           </button>
-          
+
           <button
             id="toolbar-btn-load"
             onClick={onLoad}
@@ -414,17 +435,17 @@ export default function CenterCanvas({
       </header>
 
       {/* Grid Canvas area with zoom and pan interaction */}
-      <div 
+      <div
         ref={containerRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         className={`flex-grow relative overflow-hidden bg-[#f8f9fa] select-none ${
-          isPanning ? 'cursor-grabbing' : 'cursor-grab'
+          isPanning ? "cursor-grabbing" : "cursor-grab"
         }`}
         style={{
-          backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
+          backgroundImage: "radial-gradient(#e2e8f0 1.5px, transparent 1.5px)",
           backgroundSize: `${20 * scale}px ${20 * scale}px`,
           backgroundPosition: `${pan.x}px ${pan.y}px`,
         }}
@@ -435,7 +456,9 @@ export default function CenterCanvas({
             <div className="w-20 h-20 rounded-2xl bg-indigo-50 flex items-center justify-center mb-5 animate-bounce shadow-inner">
               <MousePointer className="w-10 h-10 text-indigo-500" />
             </div>
-            <h3 className="text-base font-bold text-gray-800 tracking-tight text-center">Unleash Your Structured Flow</h3>
+            <h3 className="text-base font-bold text-gray-800 tracking-tight text-center">
+              Unleash Your Structured Flow
+            </h3>
             <p className="text-xs text-gray-400 mt-1 max-w-[280px] text-center leading-relaxed">
               No blocks yet. Add your first block from the left panel.
             </p>
@@ -451,11 +474,11 @@ export default function CenterCanvas({
         ) : (
           <>
             {/* Play flowchart view */}
-            <div 
+            <div
               ref={canvasRef}
               className="relative origin-top-left"
-              style={{ 
-                width: `${maxWidth}px`, 
+              style={{
+                width: `${maxWidth}px`,
                 height: `${maxHeight}px`,
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
               }}
@@ -528,7 +551,9 @@ export default function CenterCanvas({
                           )}
                           {/* Connection Label for Unconnected Branch */}
                           {c.label && (
-                            <g transform={`translate(${c.labelX}, ${c.labelY})`}>
+                            <g
+                              transform={`translate(${c.labelX}, ${c.labelY})`}
+                            >
                               <rect
                                 x="-20"
                                 y="-10"
@@ -572,7 +597,9 @@ export default function CenterCanvas({
                           />
                           {/* Connection Label */}
                           {c.label && (
-                            <g transform={`translate(${c.labelX}, ${c.labelY})`}>
+                            <g
+                              transform={`translate(${c.labelX}, ${c.labelY})`}
+                            >
                               <rect
                                 x="-20"
                                 y="-10"
@@ -604,9 +631,9 @@ export default function CenterCanvas({
               {/* Render absolute divs representing the custom visual nodes */}
               {nodes.map((node) => {
                 const isSelected = selectedBlockId === node.block.id;
-                
+
                 // Custom structures for specialized Shapes
-                if (node.block.type === 'decision') {
+                if (node.block.type === "decision") {
                   return (
                     <div
                       key={node.block.id}
@@ -621,7 +648,7 @@ export default function CenterCanvas({
                       className="absolute group cursor-pointer origin-center"
                     >
                       {/* Diamond visually rotated 45 degrees, sized as a neat background */}
-                      <div 
+                      <div
                         style={{
                           width: `${DIAMOND_SIZE}px`,
                           height: `${DIAMOND_SIZE}px`,
@@ -629,13 +656,13 @@ export default function CenterCanvas({
                           top: `${(NODE_HEIGHT - DIAMOND_SIZE) / 2}px`,
                         }}
                         className={`absolute border-2 shadow-md transition-all duration-200 bg-white rotate-45 ${
-                          isSelected 
-                            ? 'border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 scale-102' 
-                            : 'border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg'
+                          isSelected
+                            ? "border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 scale-102"
+                            : "border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg"
                         }`}
                       />
                       {/* Text wrapper kept upright at the same coordinates, centered perfectly */}
-                      <div 
+                      <div
                         style={{
                           width: `${DIAMOND_SIZE - 12}px`,
                           height: `${DIAMOND_SIZE - 12}px`,
@@ -652,7 +679,7 @@ export default function CenterCanvas({
                   );
                 }
 
-                if (node.block.type === 'io') {
+                if (node.block.type === "io") {
                   return (
                     <div
                       key={node.block.id}
@@ -667,21 +694,19 @@ export default function CenterCanvas({
                       className="absolute group cursor-pointer origin-center"
                     >
                       {/* Parallelogram Shape */}
-                      <div 
+                      <div
                         className={`absolute inset-0 transition-all duration-250 bg-white border-2 rounded-md shadow-md ${
-                          isSelected 
-                            ? 'border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 scale-102' 
-                            : 'border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg'
+                          isSelected
+                            ? "border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 scale-102"
+                            : "border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg"
                         }`}
                         style={{
-                          transform: 'skewX(-15deg)',
+                          transform: "skewX(-15deg)",
                         }}
                       />
-                      
+
                       {/* Counter-skewed text container */}
-                      <div 
-                        className="absolute inset-0 flex items-center justify-center px-4 text-center z-10 pointer-events-none"
-                      >
+                      <div className="absolute inset-0 flex items-center justify-center px-4 text-center z-10 pointer-events-none">
                         <span className="text-xs font-bold text-indigo-950 line-clamp-2 leading-tight select-none">
                           {node.block.label}
                         </span>
@@ -717,7 +742,11 @@ export default function CenterCanvas({
             {/* Float Zoom and Pan Control HUD Panel */}
             <div className="zoom-controls absolute bottom-6 right-6 flex items-center gap-2 bg-white px-3 py-2 rounded-xl shadow-lg border border-gray-150 z-20 select-none">
               <button
-                onClick={() => setScale(prev => Math.max(0.25, parseFloat((prev - 0.1).toFixed(2))))}
+                onClick={() =>
+                  setScale((prev) =>
+                    Math.max(0.25, parseFloat((prev - 0.1).toFixed(2))),
+                  )
+                }
                 disabled={scale <= 0.25}
                 title="Zoom Out"
                 className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 hover:border-gray-350 text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
@@ -728,7 +757,11 @@ export default function CenterCanvas({
                 {Math.round(scale * 100)}%
               </span>
               <button
-                onClick={() => setScale(prev => Math.min(3, parseFloat((prev + 0.1).toFixed(2))))}
+                onClick={() =>
+                  setScale((prev) =>
+                    Math.min(3, parseFloat((prev + 0.1).toFixed(2))),
+                  )
+                }
                 disabled={scale >= 3}
                 title="Zoom In"
                 className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 hover:border-gray-350 text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
@@ -755,7 +788,9 @@ export default function CenterCanvas({
       {showConfirmModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 max-w-sm w-full mx-4 transform transition-all scale-100">
-            <h3 className="text-sm font-bold text-gray-900 mb-2">New Flowchart Confirmation</h3>
+            <h3 className="text-sm font-bold text-gray-900 mb-2">
+              New Flowchart Confirmation
+            </h3>
             <p className="text-xs text-gray-500 leading-relaxed mb-6">
               Start a new flowchart? Current work will be lost.
             </p>
