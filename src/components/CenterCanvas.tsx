@@ -17,23 +17,34 @@ import {
   Database,
   ZoomIn,
   ZoomOut,
-  FilePlus
+  FilePlus,
+  Trash2,
+  Download,
+  Upload
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import pptxgen from 'pptxgenjs';
-import { Block, CanvasNode } from '../types';
+import { Block, CanvasNode, LayoutDirection } from '../types';
 import { calculateLayout, calculateConnections, NODE_WIDTH, NODE_HEIGHT, DIAMOND_SIZE } from '../utils/layout';
 
 interface CenterCanvasProps {
   blocks: Block[];
   selectedBlockId: string | null;
   onSelectBlock: (id: string) => void;
-  onSave: () => void;
-  onLoad: () => void;
+  onSave: (name: string) => void;
+  onLoad: (name: string) => void;
+  onDeleteWorkspace: (name: string) => void;
+  onExport: (format: 'png' | 'pdf' | 'pptx') => void;
+  onExportJSON: () => void;
+  onImportJSON: (file: File) => void;
   onNewFlowchart: () => void;
   onAddFirstBlock: () => void;
   showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
+  workspaces: string[];
+  currentWorkspace: string;
+  layoutDirection: LayoutDirection;
+  onLayoutDirectionChange: (direction: LayoutDirection) => void;
 }
 
 export default function CenterCanvas({
@@ -42,16 +53,24 @@ export default function CenterCanvas({
   onSelectBlock,
   onSave,
   onLoad,
+  onDeleteWorkspace,
+  onExport,
+  onExportJSON,
+  onImportJSON,
   onNewFlowchart,
   onAddFirstBlock,
   showToast,
+  workspaces,
+  currentWorkspace,
+  layoutDirection,
+  onLayoutDirectionChange,
 }: CenterCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Apply layout algorithm
-  const nodes = calculateLayout(blocks);
-  const connections = calculateConnections(nodes);
+  const nodes = calculateLayout(blocks, layoutDirection);
+  const connections = calculateConnections(nodes, layoutDirection);
 
   // Zoom & Pan states
   const [scale, setScale] = useState(1);
@@ -343,16 +362,39 @@ export default function CenterCanvas({
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Workspace</span>
           <span className="text-gray-300">/</span>
-          <span className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-            Form-Flow Sandbox
-            <span className="px-1.5 py-0.5 bg-indigo-50 text-[10px] text-indigo-600 rounded-md font-semibold font-mono">STABLE</span>
-          </span>
+          <select 
+            value={currentWorkspace} 
+            onChange={(e) => onLoad(e.target.value)}
+            className="text-sm font-bold text-gray-800 bg-transparent border-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-sm max-w-[150px] truncate appearance-none"
+            style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
+          >
+            {workspaces.map(w => <option key={w} value={w}>{w}</option>)}
+          </select>
+          <span className="px-1.5 py-0.5 bg-indigo-50 text-[10px] text-indigo-600 rounded-md font-semibold font-mono">STABLE</span>
+          <button onClick={() => {
+            let name = prompt('Save workspace as (enter new name):', currentWorkspace + ' Copy');
+            if (name) {
+              name = name.trim();
+              if (name === '') return;
+              if (workspaces.includes(name) && name !== currentWorkspace) {
+                if (!confirm(`Workspace "${name}" already exists. Overwrite?`)) return;
+              }
+              onSave(name);
+            }
+          }} title="Save As" className="text-gray-400 hover:text-indigo-600 cursor-pointer ml-1 p-1">
+             <Save className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => {
+            if(confirm(`Are you sure you want to delete the workspace "${currentWorkspace}"?`)) onDeleteWorkspace(currentWorkspace);
+          }} title="Delete Workspace" className="text-gray-400 hover:text-red-600 cursor-pointer p-1">
+             <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             id="toolbar-btn-save"
-            onClick={onSave}
+            onClick={() => onSave(currentWorkspace)}
             title="Save blueprint to Local Storage"
             className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
@@ -360,14 +402,30 @@ export default function CenterCanvas({
             Save
           </button>
           
+          <label className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer">
+            <Upload className="w-3.5 h-3.5" />
+            Import JSON
+            <input type="file" accept=".json" className="hidden" onChange={(e) => {
+               if(e.target.files?.[0]) onImportJSON(e.target.files[0]);
+               e.target.value = '';
+            }} />
+          </label>
+
           <button
-            id="toolbar-btn-load"
-            onClick={onLoad}
-            title="Load blueprint from Local Storage"
+            onClick={onExportJSON}
+            title="Export blueprint as JSON"
             className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <FolderOpen className="w-3.5 h-3.5" />
-            Load
+            <Download className="w-3.5 h-3.5" />
+            Export JSON
+          </button>
+
+          <button
+            onClick={() => onLayoutDirectionChange(layoutDirection === 'vertical' ? 'horizontal' : 'vertical')}
+            title="Toggle layout direction"
+            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            {layoutDirection === 'vertical' ? '↕ Vertical' : '↔ Horizontal'}
           </button>
 
           <button
@@ -377,7 +435,7 @@ export default function CenterCanvas({
             className="px-3 py-1.5 border border-red-200 hover:border-red-350 text-red-650 hover:text-red-800 hover:bg-red-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <FilePlus className="w-3.5 h-3.5 text-red-500" />
-            New Flowchart
+            New
           </button>
 
           <div className="h-4 w-px bg-gray-200 mx-1"></div>
