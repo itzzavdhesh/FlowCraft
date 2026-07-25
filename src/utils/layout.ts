@@ -29,26 +29,56 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
     parentsMap.set(b.id, []);
   });
 
+  // 1.5 Detect Back-Edges to prevent cyclic stalling
+  const backEdges = new Set<string>();
+  const visited = new Set<string>();
+  const recursionStack = new Set<string>();
+
+  const dfs = (nodeId: string) => {
+    visited.add(nodeId);
+    recursionStack.add(nodeId);
+
+    const block = blocks.find(b => b.id === nodeId);
+    if (block) {
+      const targets: string[] = [];
+      if (block.type === 'decision') {
+        if (block.yesTargetId) targets.push(block.yesTargetId);
+        if (block.noTargetId) targets.push(block.noTargetId);
+      } else {
+        if (block.targetId) targets.push(block.targetId);
+      }
+
+      for (const targetId of targets) {
+        if (!visited.has(targetId)) {
+          dfs(targetId);
+        } else if (recursionStack.has(targetId)) {
+          backEdges.add(`${nodeId}->${targetId}`);
+        }
+      }
+    }
+    recursionStack.delete(nodeId);
+  };
+
+  blocks.forEach(b => {
+    if (!visited.has(b.id)) {
+      dfs(b.id);
+    }
+  });
+
   blocks.forEach((b) => {
-    const addParent = (childId: string, parentId: string) => {
+    const addEdge = (childId: string, parentId: string) => {
+      if (backEdges.has(`${parentId}->${childId}`)) return; // Ignore back-edges
+      
+      incomingMap.set(childId, (incomingMap.get(childId) || 0) + 1);
       if (parentsMap.has(childId)) {
         parentsMap.get(childId)!.push(parentId);
       }
     };
     if (b.type === 'decision') {
-      if (b.yesTargetId && b.yesTargetId !== b.id) {
-        incomingMap.set(b.yesTargetId, (incomingMap.get(b.yesTargetId) || 0) + 1);
-        addParent(b.yesTargetId, b.id);
-      }
-      if (b.noTargetId && b.noTargetId !== b.id) {
-        incomingMap.set(b.noTargetId, (incomingMap.get(b.noTargetId) || 0) + 1);
-        addParent(b.noTargetId, b.id);
-      }
+      if (b.yesTargetId && b.yesTargetId !== b.id) addEdge(b.yesTargetId, b.id);
+      if (b.noTargetId && b.noTargetId !== b.id) addEdge(b.noTargetId, b.id);
     } else {
-      if (b.targetId && b.targetId !== b.id) {
-        incomingMap.set(b.targetId, (incomingMap.get(b.targetId) || 0) + 1);
-        addParent(b.targetId, b.id);
-      }
+      if (b.targetId && b.targetId !== b.id) addEdge(b.targetId, b.id);
     }
   });
 
@@ -218,6 +248,7 @@ export interface SvgLine {
   startY?: number;
   endX?: number;
   endY?: number;
+  bounds?: { minX: number; maxX: number; minY: number; maxY: number };
 }
 
 /**
@@ -245,6 +276,11 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
     }
   });
 
+  const minX = nodes.length > 0 ? Math.min(...nodes.map(n => n.x)) : 0;
+  const maxX = nodes.length > 0 ? Math.max(...nodes.map(n => n.x + NODE_WIDTH)) : 0;
+  const layoutBounds = { minX, maxX };
+  const backwardLanes = { left: 0, right: 0 };
+
   nodes.forEach((source) => {
     const block = source.block;
 
@@ -253,10 +289,10 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
       const sourceCy = source.y + NODE_HEIGHT / 2;
 
       // YES BRANCH
-      if (block.yesTargetId && block.yesTargetId !== block.id) {
+      if (block.yesTargetId) {
         const target = nodes.find((n) => n.block.id === block.yesTargetId);
         if (target) {
-          lines.push(generateConnection(source, target, block.yesLabel || 'Yes', 'yes', sharedTargets.has(target.block.id), layoutDirection));
+          lines.push(generateConnection(source, target, block.yesLabel || 'Yes', 'yes', sharedTargets.has(target.block.id), layoutDirection, layoutBounds, backwardLanes));
         } else {
           // If the target is set but somehow not in the nodes, treat as unconnected
           const startX = sourceCx + DIAMOND_HALF_DIAG;
@@ -297,10 +333,10 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
       }
 
       // NO BRANCH
-      if (block.noTargetId && block.noTargetId !== block.id) {
+      if (block.noTargetId) {
         const target = nodes.find((n) => n.block.id === block.noTargetId);
         if (target) {
-          lines.push(generateConnection(source, target, block.noLabel || 'No', 'no', sharedTargets.has(target.block.id), layoutDirection));
+          lines.push(generateConnection(source, target, block.noLabel || 'No', 'no', sharedTargets.has(target.block.id), layoutDirection, layoutBounds, backwardLanes));
         } else {
           // If the target is set but somehow not in the nodes, treat as unconnected
           const startX = sourceCx - DIAMOND_HALF_DIAG;
@@ -341,10 +377,10 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
       }
     } else {
       // Standard Connection (Terminator, Process, IO)
-      if (block.targetId && block.targetId !== block.id) {
+      if (block.targetId) {
         const target = nodes.find((n) => n.block.id === block.targetId);
         if (target) {
-          lines.push(generateConnection(source, target, undefined, 'standard', sharedTargets.has(target.block.id), layoutDirection));
+          lines.push(generateConnection(source, target, undefined, 'standard', sharedTargets.has(target.block.id), layoutDirection, layoutBounds, backwardLanes));
         }
       }
     }
@@ -359,7 +395,9 @@ function generateConnection(
   label: string | undefined,
   connectionType: 'yes' | 'no' | 'standard',
   isSharedTarget: boolean = false,
-  layoutDirection: LayoutDirection = 'vertical'
+  layoutDirection: LayoutDirection = 'vertical',
+  layoutBounds: { minX: number; maxX: number } = { minX: 0, maxX: 0 },
+  backwardLanes: { left: number; right: number } = { left: 0, right: 0 }
 ): SvgLine {
   const isSourceDecision = source.block.type === 'decision';
   const isTargetDecision = target.block.type === 'decision';
@@ -369,7 +407,8 @@ function generateConnection(
   const targetCx = target.x + NODE_WIDTH / 2;
   const targetCy = target.y + NODE_HEIGHT / 2;
 
-  let startX, startY, endX, endY, path = '', labelX = 0, labelY = 0;
+  let startX = 0, startY = 0, endX = 0, endY = 0, path = '', labelX = 0, labelY = 0;
+  const isBackward = layoutDirection === 'vertical' ? source.row >= target.row : source.col >= target.col;
 
   if (layoutDirection === 'vertical') {
     startX = sourceCx;
@@ -388,26 +427,68 @@ function generateConnection(
     endX = targetCx;
     endY = target.y;
 
-    if (isSharedTarget) {
-      if (source.col < target.col) {
-        endX = target.x;
-        endY = target.y + NODE_HEIGHT / 2;
-      } else if (source.col > target.col) {
-        endX = target.x + NODE_WIDTH;
-        endY = target.y + NODE_HEIGHT / 2;
-      } else {
+    if (!isBackward) {
+      if (isSharedTarget) {
+        if (source.col < target.col) {
+          endX = target.x;
+          endY = target.y + NODE_HEIGHT / 2;
+        } else if (source.col > target.col) {
+          endX = target.x + NODE_WIDTH;
+          endY = target.y + NODE_HEIGHT / 2;
+        } else {
+          endX = targetCx;
+          endY = target.y;
+        }
+      } else if (isTargetDecision) {
         endX = targetCx;
-        endY = target.y;
+        endY = targetCy - DIAMOND_HALF_DIAG;
       }
-    } else if (isTargetDecision) {
+    } else {
+      // Backward edges always enter from top for simplicity
       endX = targetCx;
-      endY = targetCy - DIAMOND_HALF_DIAG;
+      endY = isTargetDecision ? targetCy - DIAMOND_HALF_DIAG : target.y;
     }
 
     labelX = (startX + endX) / 2;
     labelY = (startY + endY) / 2;
 
-    if (isSourceDecision) {
+    if (isBackward) {
+      let marginX: number;
+      let isLeft = false;
+
+      if (isSourceDecision) {
+        isLeft = connectionType !== 'yes';
+      } else {
+        const distLeft = sourceCx - layoutBounds.minX;
+        const distRight = layoutBounds.maxX - sourceCx;
+        isLeft = distLeft < distRight;
+      }
+
+      if (isLeft) {
+        const offset = 100 + backwardLanes.left * 40;
+        marginX = layoutBounds.minX - offset;
+        if (isSharedTarget) endX = targetCx - 10 - backwardLanes.left * 15;
+        backwardLanes.left++;
+      } else {
+        const offset = 100 + backwardLanes.right * 40;
+        marginX = layoutBounds.maxX + offset;
+        if (isSharedTarget) endX = targetCx + 10 + backwardLanes.right * 15;
+        backwardLanes.right++;
+      }
+
+      const upY = target.y - 30;
+
+      if (isSourceDecision) {
+        path = `M ${startX} ${startY} L ${marginX} ${startY} L ${marginX} ${upY} L ${endX} ${upY} L ${endX} ${endY}`;
+        labelX = marginX;
+        labelY = (startY + target.y) / 2;
+      } else {
+        const initialDrop = startY + 20;
+        path = `M ${startX} ${startY} L ${startX} ${initialDrop} L ${marginX} ${initialDrop} L ${marginX} ${upY} L ${endX} ${upY} L ${endX} ${endY}`;
+        labelX = marginX;
+        labelY = (startY + target.y) / 2;
+      }
+    } else if (isSourceDecision) {
       if (isSharedTarget && source.col !== target.col) {
         const midX = (sourceCx + targetCx) / 2;
         path = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
@@ -534,6 +615,23 @@ function generateConnection(
     }
   }
 
+  let bounds = { minX: startX, maxX: startX, minY: startY, maxY: startY };
+  const nums = path.match(/-?\d+(\.\d+)?/g);
+  if (nums && nums.length > 0) {
+    const xs = [];
+    const ys = [];
+    for (let i = 0; i < nums.length; i += 2) {
+      xs.push(parseFloat(nums[i]));
+      ys.push(parseFloat(nums[i+1]));
+    }
+    bounds = {
+      minX: Math.min(...xs),
+      maxX: Math.max(...xs),
+      minY: Math.min(...ys),
+      maxY: Math.max(...ys),
+    };
+  }
+
   return {
     id: `${source.block.id}-${target.block.id}-${connectionType}`,
     sourceId: source.block.id,
@@ -546,5 +644,6 @@ function generateConnection(
     startY,
     endX,
     endY,
+    bounds,
   };
 }
