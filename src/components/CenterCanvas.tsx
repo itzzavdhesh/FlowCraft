@@ -18,6 +18,8 @@ import {
   ZoomIn,
   ZoomOut,
   FilePlus,
+  Moon,
+  Sun,
   Trash2,
   Download,
   Upload
@@ -41,6 +43,8 @@ interface CenterCanvasProps {
   onNewFlowchart: () => void;
   onAddFirstBlock: () => void;
   showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
+  isDarkMode: boolean;
+  toggleDarkMode: () => void;
   workspaces: string[];
   currentWorkspace: string;
   layoutDirection: LayoutDirection;
@@ -60,6 +64,8 @@ export default function CenterCanvas({
   onNewFlowchart,
   onAddFirstBlock,
   showToast,
+  isDarkMode,
+  toggleDarkMode,
   workspaces,
   currentWorkspace,
   layoutDirection,
@@ -141,21 +147,40 @@ export default function CenterCanvas({
 
   // Determine bounds of the layout to ensure the canvas scroll area fits all nodes comfortably
   // Set minimum height and width larger than standard viewports to guarantee spacious scroll bounds
-  const minWidth = 1400;
-  const minHeight = 1000;
-  let maxWidth = minWidth;
-  let maxHeight = minHeight;
+  let minLayoutX = 0;
+  let minLayoutY = 0;
+  let maxLayoutX = minWidth;
+  let maxLayoutY = minHeight;
+
   nodes.forEach(node => {
-    maxWidth = Math.max(maxWidth, node.x + NODE_WIDTH + 250);
-    maxHeight = Math.max(maxHeight, node.y + NODE_HEIGHT + 250);
+    minLayoutX = Math.min(minLayoutX, node.x);
+    minLayoutY = Math.min(minLayoutY, node.y);
+    maxLayoutX = Math.max(maxLayoutX, node.x + NODE_WIDTH);
+    maxLayoutY = Math.max(maxLayoutY, node.y + NODE_HEIGHT);
   });
+
+
+  connections.forEach(conn => {
+    if (conn.bounds) {
+      minLayoutX = Math.min(minLayoutX, conn.bounds.minX);
+      minLayoutY = Math.min(minLayoutY, conn.bounds.minY);
+      maxLayoutX = Math.max(maxLayoutX, conn.bounds.maxX);
+      maxLayoutY = Math.max(maxLayoutY, conn.bounds.maxY);
+    }
+  });
+
+  const offsetX = minLayoutX < 50 ? Math.abs(minLayoutX) + 100 : 0;
+  const offsetY = minLayoutY < 50 ? Math.abs(minLayoutY) + 100 : 0;
+
+  const maxWidth = maxLayoutX + offsetX + 250;
+  const maxHeight = maxLayoutY + offsetY + 250;
 
   const handleExportPNG = async () => {
     if (!canvasRef.current) return;
     try {
       showToast?.('Generating PNG...', 'info');
       const dataUrl = await toPng(canvasRef.current, {
-        backgroundColor: '#f8f9fa',
+        backgroundColor: isDarkMode ? '#0f172a' : '#f8f9fa',
         style: {
           transform: 'translate(0px, 0px) scale(1)',
         },
@@ -177,7 +202,7 @@ export default function CenterCanvas({
     try {
       showToast?.('Generating PDF...', 'info');
       const dataUrl = await toPng(canvasRef.current, {
-        backgroundColor: '#f8f9fa',
+        backgroundColor: isDarkMode ? '#0f172a' : '#f8f9fa',
         style: {
           transform: 'translate(0px, 0px) scale(1)',
         },
@@ -337,40 +362,40 @@ export default function CenterCanvas({
   const getShapeStyle = (type: string, isSelected: boolean) => {
     const baseClass = "absolute transition-all duration-250 cursor-pointer flex items-center justify-center border-2 shadow-md ";
     const selectedClass = isSelected 
-      ? "border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 shadow-lg scale-102"
-      : "border-indigo-500 hover:border-indigo-650 hover:shadow-lg hover:scale-101";
+      ? "border-indigo-600 dark:border-indigo-400 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 shadow-lg scale-102"
+      : "border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 hover:shadow-lg hover:scale-101";
 
     switch (type) {
       case 'terminator':
-        return `${baseClass} ${selectedClass} rounded-full bg-white text-indigo-900`;
+        return `${baseClass} ${selectedClass} rounded-full bg-white dark:bg-slate-800 text-indigo-900 dark:text-indigo-100`;
       case 'process':
-        return `${baseClass} ${selectedClass} rounded-xl bg-white text-indigo-950`;
+        return `${baseClass} ${selectedClass} rounded-xl bg-white dark:bg-slate-800 text-indigo-950 dark:text-indigo-100`;
       case 'decision':
         // A rotated square needs specific sizing and text handling
-        return `${baseClass} ${selectedClass} bg-white text-indigo-950`;
+        return `${baseClass} ${selectedClass} bg-white dark:bg-slate-800 text-indigo-950 dark:text-indigo-100`;
       case 'io':
-        return `${baseClass} ${selectedClass} bg-white text-indigo-950`;
+        return `${baseClass} ${selectedClass} bg-white dark:bg-slate-800 text-indigo-950 dark:text-indigo-100`;
       default:
-        return `${baseClass} ${selectedClass} bg-white text-indigo-950`;
+        return `${baseClass} ${selectedClass} bg-white dark:bg-slate-800 text-indigo-950 dark:text-indigo-100`;
     }
   };
 
   return (
-    <div className="flex-grow h-full flex flex-col min-w-0 bg-[#fbfbfc]">
+    <div className="flex-grow h-full flex flex-col min-w-0 bg-[#fbfbfc] dark:bg-slate-900">
       {/* Top Toolbar */}
-      <header className="h-[64px] bg-white border-b border-gray-100 shadow-xs px-6 flex items-center justify-between shrink-0 select-none z-10">
+      <header className="h-[64px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 shadow-xs px-6 flex items-center justify-between shrink-0 select-none z-10">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Workspace</span>
-          <span className="text-gray-300">/</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Workspace</span>
+          <span className="text-gray-300 dark:text-slate-600">/</span>
           <select 
             value={currentWorkspace} 
             onChange={(e) => onLoad(e.target.value)}
-            className="text-sm font-bold text-gray-800 bg-transparent border-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-sm max-w-[150px] truncate appearance-none"
+            className="text-sm font-bold text-gray-800 dark:text-slate-100 bg-transparent border-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-sm max-w-[150px] truncate appearance-none"
             style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
           >
-            {workspaces.map(w => <option key={w} value={w}>{w}</option>)}
+            {workspaces.map(w => <option key={w} value={w} className="dark:bg-slate-800">{w}</option>)}
           </select>
-          <span className="px-1.5 py-0.5 bg-indigo-50 text-[10px] text-indigo-600 rounded-md font-semibold font-mono">STABLE</span>
+          <span className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/40 text-[10px] text-indigo-600 dark:text-indigo-300 rounded-md font-semibold font-mono">STABLE</span>
           <button onClick={() => {
             let name = prompt('Save workspace as (enter new name):', currentWorkspace + ' Copy');
             if (name) {
@@ -381,28 +406,36 @@ export default function CenterCanvas({
               }
               onSave(name);
             }
-          }} title="Save As" className="text-gray-400 hover:text-indigo-600 cursor-pointer ml-1 p-1">
+          }} title="Save As" className="text-gray-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer ml-1 p-1">
              <Save className="w-3.5 h-3.5" />
           </button>
           <button onClick={() => {
             if(confirm(`Are you sure you want to delete the workspace "${currentWorkspace}"?`)) onDeleteWorkspace(currentWorkspace);
-          }} title="Delete Workspace" className="text-gray-400 hover:text-red-600 cursor-pointer p-1">
+          }} title="Delete Workspace" className="text-gray-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 cursor-pointer p-1">
              <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="flex items-center gap-2">
           <button
+            onClick={toggleDarkMode}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            className="px-2 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer mr-2"
+          >
+            {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
+          <button
             id="toolbar-btn-save"
             onClick={() => onSave(currentWorkspace)}
             title="Save blueprint to Local Storage"
-            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Save className="w-3.5 h-3.5" />
             Save
           </button>
           
-          <label className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer">
+          <label className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer">
             <Upload className="w-3.5 h-3.5" />
             Import JSON
             <input type="file" accept=".json" className="hidden" onChange={(e) => {
@@ -414,7 +447,7 @@ export default function CenterCanvas({
           <button
             onClick={onExportJSON}
             title="Export blueprint as JSON"
-            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             Export JSON
@@ -423,7 +456,7 @@ export default function CenterCanvas({
           <button
             onClick={() => onLayoutDirectionChange(layoutDirection === 'vertical' ? 'horizontal' : 'vertical')}
             title="Toggle layout direction"
-            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             {layoutDirection === 'vertical' ? '↕ Vertical' : '↔ Horizontal'}
           </button>
@@ -432,18 +465,18 @@ export default function CenterCanvas({
             id="toolbar-btn-new-flowchart"
             onClick={() => setShowConfirmModal(true)}
             title="Start an empty flowchart"
-            className="px-3 py-1.5 border border-red-200 hover:border-red-350 text-red-650 hover:text-red-800 hover:bg-red-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 border border-red-200 dark:border-red-900 hover:border-red-350 dark:hover:border-red-700 text-red-650 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <FilePlus className="w-3.5 h-3.5 text-red-500" />
+            <FilePlus className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
             New
           </button>
 
-          <div className="h-4 w-px bg-gray-200 mx-1"></div>
+          <div className="h-4 w-px bg-gray-200 dark:bg-slate-600 mx-1"></div>
 
           <button
             id="toolbar-btn-export-png"
             onClick={handleExportPNG}
-            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <FileImage className="w-3.5 h-3.5" />
             Export PNG
@@ -452,7 +485,7 @@ export default function CenterCanvas({
           <button
             id="toolbar-btn-export-pdf"
             onClick={handleExportPDF}
-            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <FileText className="w-3.5 h-3.5" />
             Export PDF
@@ -478,11 +511,13 @@ export default function CenterCanvas({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        className={`flex-grow relative overflow-hidden bg-[#f8f9fa] select-none ${
+        className={`flex-grow relative overflow-hidden bg-[#f8f9fa] dark:bg-slate-900 select-none ${
           isPanning ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
-          backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
+          backgroundImage: isDarkMode 
+            ? 'radial-gradient(#334155 1.5px, transparent 1.5px)'
+            : 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
           backgroundSize: `${20 * scale}px ${20 * scale}px`,
           backgroundPosition: `${pan.x}px ${pan.y}px`,
         }}
@@ -490,11 +525,11 @@ export default function CenterCanvas({
         {blocks.length === 0 ? (
           // Empty State Component
           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 select-none">
-            <div className="w-20 h-20 rounded-2xl bg-indigo-50 flex items-center justify-center mb-5 animate-bounce shadow-inner">
-              <MousePointer className="w-10 h-10 text-indigo-500" />
+            <div className="w-20 h-20 rounded-2xl bg-indigo-50 dark:bg-slate-800 flex items-center justify-center mb-5 animate-bounce shadow-inner">
+              <MousePointer className="w-10 h-10 text-indigo-500 dark:text-indigo-400" />
             </div>
-            <h3 className="text-base font-bold text-gray-800 tracking-tight text-center">Unleash Your Structured Flow</h3>
-            <p className="text-xs text-gray-400 mt-1 max-w-[280px] text-center leading-relaxed">
+            <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 tracking-tight text-center">Unleash Your Structured Flow</h3>
+            <p className="text-xs text-gray-400 dark:text-slate-400 mt-1 max-w-[280px] text-center leading-relaxed">
               No blocks yet. Add your first block from the left panel.
             </p>
             <button
@@ -511,7 +546,7 @@ export default function CenterCanvas({
             {/* Play flowchart view */}
             <div 
               ref={canvasRef}
-              className="relative origin-top-left"
+              className={`relative origin-top-left ${isDarkMode ? 'dark' : ''}`}
               style={{ 
                 width: `${maxWidth}px`, 
                 height: `${maxHeight}px`,
@@ -544,6 +579,7 @@ export default function CenterCanvas({
                     <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#94a3b8" />
                   </marker>
                 </defs>
+                <g transform={`translate(${offsetX}, ${offsetY})`}>
 
                 {connections.map((c) => {
                   const isUnconnected = !!(c as any).isUnconnected;
@@ -657,6 +693,7 @@ export default function CenterCanvas({
                     </g>
                   );
                 })}
+                </g>
               </svg>
 
               {/* Render absolute divs representing the custom visual nodes */}
@@ -676,7 +713,7 @@ export default function CenterCanvas({
                         width: `${NODE_WIDTH}px`,
                         height: `${NODE_HEIGHT}px`,
                       }}
-                      className="absolute group cursor-pointer origin-center"
+                      className="absolute group cursor-pointer origin-center text-indigo-950 dark:text-indigo-100"
                     >
                       {/* Diamond visually rotated 45 degrees, sized as a neat background */}
                       <div 
@@ -686,10 +723,10 @@ export default function CenterCanvas({
                           left: `${(NODE_WIDTH - DIAMOND_SIZE) / 2}px`,
                           top: `${(NODE_HEIGHT - DIAMOND_SIZE) / 2}px`,
                         }}
-                        className={`absolute border-2 shadow-md transition-all duration-200 bg-white rotate-45 ${
+                        className={`absolute border-2 shadow-md transition-all duration-200 bg-white dark:bg-slate-800 rotate-45 ${
                           isSelected 
-                            ? 'border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 scale-102' 
-                            : 'border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg'
+                            ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102' 
+                            : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
                         }`}
                       />
                       {/* Text wrapper kept upright at the same coordinates, centered perfectly */}
@@ -702,7 +739,7 @@ export default function CenterCanvas({
                         }}
                         className="absolute flex items-center justify-center p-2 text-center z-10 pointer-events-none"
                       >
-                        <span className="text-xs font-bold text-indigo-950 line-clamp-3 leading-tight select-none">
+                        <span className="text-xs font-bold line-clamp-3 leading-tight select-none">
                           {node.block.label}
                         </span>
                       </div>
@@ -722,14 +759,14 @@ export default function CenterCanvas({
                         width: `${NODE_WIDTH}px`,
                         height: `${NODE_HEIGHT}px`,
                       }}
-                      className="absolute group cursor-pointer origin-center"
+                      className="absolute group cursor-pointer origin-center text-indigo-950 dark:text-indigo-100"
                     >
                       {/* Parallelogram Shape */}
                       <div 
-                        className={`absolute inset-0 transition-all duration-250 bg-white border-2 rounded-md shadow-md ${
+                        className={`absolute inset-0 transition-all duration-250 bg-white dark:bg-slate-800 border-2 rounded-md shadow-md ${
                           isSelected 
-                            ? 'border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 scale-102' 
-                            : 'border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg'
+                            ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102' 
+                            : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
                         }`}
                         style={{
                           transform: 'skewX(-15deg)',
@@ -740,7 +777,7 @@ export default function CenterCanvas({
                       <div 
                         className="absolute inset-0 flex items-center justify-center px-4 text-center z-10 pointer-events-none"
                       >
-                        <span className="text-xs font-bold text-indigo-950 line-clamp-2 leading-tight select-none">
+                        <span className="text-xs font-bold line-clamp-2 leading-tight select-none">
                           {node.block.label}
                         </span>
                       </div>
@@ -763,7 +800,7 @@ export default function CenterCanvas({
                     className={getShapeStyle(node.block.type, isSelected)}
                   >
                     <div className="px-4 text-center">
-                      <span className="text-xs font-bold text-indigo-950 line-clamp-2 leading-tight">
+                      <span className="text-xs font-bold line-clamp-2 leading-tight">
                         {node.block.label}
                       </span>
                     </div>

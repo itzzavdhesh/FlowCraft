@@ -122,6 +122,41 @@ export default function App() {
     } catch {}
   }, []);
 
+  // Dark mode state
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    let initialDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    try {
+      const saved = localStorage.getItem('flowforge_dark_mode');
+      if (saved) initialDark = saved === 'true';
+    } catch {
+      // Ignore storage errors
+    }
+    
+    // Apply class pre-paint
+    if (initialDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    return initialDark;
+  });
+
+  useEffect(() => {
+    // Preserve ongoing theme synchronization after mount
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    try {
+      localStorage.setItem('flowforge_dark_mode', String(isDarkMode));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
+
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     const newToast: ToastConfig = {
@@ -404,7 +439,7 @@ export default function App() {
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null;
 
   return (
-    <div className="flex h-screen w-screen bg-[#fafafa] font-sans overflow-hidden">
+    <div className="flex h-screen w-screen bg-[#fafafa] dark:bg-slate-900 font-sans overflow-hidden">
       {/* LEFT SIDEBAR CONTROLS */}
       <LeftSidebar
         blocks={blocks}
@@ -436,6 +471,8 @@ export default function App() {
           showToast('Loaded vertical flow template!');
         }}
         showToast={showToast}
+        isDarkMode={isDarkMode}
+        toggleDarkMode={toggleDarkMode}
         layoutDirection={layoutDirection}
         onLayoutDirectionChange={setLayoutDirection}
       />
