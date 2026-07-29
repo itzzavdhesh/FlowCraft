@@ -259,7 +259,10 @@ export default function App() {
     if (!targetBlock) return;
 
     const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
-    let canAcceptChild = false;
+    const canAcceptChild =
+      targetBlock.type !== 'decision' ||
+      !targetBlock.yesTargetId ||
+      !targetBlock.noTargetId;
 
     setBlocks((prev) => {
       const idx = prev.findIndex((b) => b.id === id);
@@ -271,11 +274,6 @@ export default function App() {
         id: newId,
         label: `${currentOriginal.label} (Copy)`,
       };
-
-      canAcceptChild =
-        currentOriginal.type !== 'decision' ||
-        !currentOriginal.yesTargetId ||
-        !currentOriginal.noTargetId;
 
       const updated = [...prev];
       if (currentOriginal.type !== 'decision') {

@@ -65,7 +65,7 @@ export function useKeyboardShortcuts({
       }
 
       // Help Modal shortcut: Shift + ? (or ?)
-      if (e.key === '?' && !target?.tagName?.match(/^(INPUT|TEXTAREA)$/i)) {
+      if (e.key === '?' && !isInteractiveElement(target)) {
         e.preventDefault();
         onToggleShortcutsHelp();
         return;

@@ -21,9 +21,9 @@ export function findRootBlock(blocks: Block[]): Block | null {
 
   const targetIds = new Set<string>();
   blocks.forEach((b) => {
-    if (b.targetId) targetIds.add(b.targetId);
-    if (b.yesTargetId) targetIds.add(b.yesTargetId);
-    if (b.noTargetId) targetIds.add(b.noTargetId);
+    if (b.targetId && b.targetId !== b.id) targetIds.add(b.targetId);
+    if (b.yesTargetId && b.yesTargetId !== b.id) targetIds.add(b.yesTargetId);
+    if (b.noTargetId && b.noTargetId !== b.id) targetIds.add(b.noTargetId);
   });
 
   const roots = blocks.filter((b) => !targetIds.has(b.id));
