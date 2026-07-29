@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 
 interface Props {
   children?: ReactNode;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
 interface State {
@@ -21,6 +22,9 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo);
+    }
   }
 
   public render() {
