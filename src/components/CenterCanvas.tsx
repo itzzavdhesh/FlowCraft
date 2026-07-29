@@ -22,7 +22,10 @@ import {
   Sun,
   Trash2,
   Download,
-  Upload
+  Upload,
+  Keyboard,
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -49,6 +52,8 @@ interface CenterCanvasProps {
   currentWorkspace: string;
   layoutDirection: LayoutDirection;
   onLayoutDirectionChange: (direction: LayoutDirection) => void;
+  showShortcutsHelp?: boolean;
+  onToggleShortcutsHelp?: () => void;
 }
 
 export default function CenterCanvas({
@@ -70,6 +75,8 @@ export default function CenterCanvas({
   currentWorkspace,
   layoutDirection,
   onLayoutDirectionChange,
+  showShortcutsHelp = false,
+  onToggleShortcutsHelp,
 }: CenterCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -83,7 +90,19 @@ export default function CenterCanvas({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const panStart = useRef({ x: 0, y: 0 });
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Mouse pan event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -144,6 +163,9 @@ export default function CenterCanvas({
       container.removeEventListener('wheel', onWheel);
     };
   }, []);
+
+  const minWidth = 1200;
+  const minHeight = 800;
 
   // Determine bounds of the layout to ensure the canvas scroll area fits all nodes comfortably
   // Set minimum height and width larger than standard viewports to guarantee spacious scroll bounds
@@ -383,19 +405,19 @@ export default function CenterCanvas({
   return (
     <div className="flex-grow h-full flex flex-col min-w-0 bg-[#fbfbfc] dark:bg-slate-900">
       {/* Top Toolbar */}
-      <header className="h-[64px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 shadow-xs px-6 flex items-center justify-between shrink-0 select-none z-10">
-        <div className="flex items-center gap-2">
+      <header className="h-[64px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 shadow-xs px-4 flex items-center justify-between shrink-0 select-none z-10 overflow-x-auto overflow-y-visible custom-scrollbar flex-nowrap min-w-0 max-w-full">
+        <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Workspace</span>
           <span className="text-gray-300 dark:text-slate-600">/</span>
           <select 
             value={currentWorkspace} 
             onChange={(e) => onLoad(e.target.value)}
-            className="text-sm font-bold text-gray-800 dark:text-slate-100 bg-transparent border-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-sm max-w-[150px] truncate appearance-none"
+            className="text-sm font-bold text-gray-800 dark:text-slate-100 bg-transparent border-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-sm max-w-[140px] truncate appearance-none"
             style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
           >
             {workspaces.map(w => <option key={w} value={w} className="dark:bg-slate-800">{w}</option>)}
           </select>
-          <span className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/40 text-[10px] text-indigo-600 dark:text-indigo-300 rounded-md font-semibold font-mono">STABLE</span>
+          <span className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/40 text-[10px] text-indigo-600 dark:text-indigo-300 rounded-md font-semibold font-mono hidden sm:inline">STABLE</span>
           <button onClick={() => {
             let name = prompt('Save workspace as (enter new name):', currentWorkspace + ' Copy');
             if (name) {
@@ -416,28 +438,38 @@ export default function CenterCanvas({
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
           <button
             onClick={toggleDarkMode}
             title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            className="px-2 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer mr-2"
+            className="px-2 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
+          <button
+            id="toolbar-btn-shortcuts"
+            onClick={onToggleShortcutsHelp}
+            title="Keyboard Shortcuts (Shift + ?)"
+            className="px-2 py-1.5 border border-indigo-200 dark:border-indigo-800 hover:border-indigo-300 dark:hover:border-indigo-700 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <Keyboard className="w-4 h-4" />
+            <span className="hidden md:inline">Shortcuts</span>
           </button>
 
           <button
             id="toolbar-btn-save"
             onClick={() => onSave(currentWorkspace)}
             title="Save blueprint to Local Storage"
-            className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Save className="w-3.5 h-3.5" />
             Save
           </button>
           
-          <label className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer">
+          <label className="px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer">
             <Upload className="w-3.5 h-3.5" />
-            Import JSON
+            <span>Import</span>
             <input type="file" accept=".json" className="hidden" onChange={(e) => {
                if(e.target.files?.[0]) onImportJSON(e.target.files[0]);
                e.target.value = '';
@@ -445,18 +477,9 @@ export default function CenterCanvas({
           </label>
 
           <button
-            onClick={onExportJSON}
-            title="Export blueprint as JSON"
-            className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Export JSON
-          </button>
-
-          <button
             onClick={() => onLayoutDirectionChange(layoutDirection === 'vertical' ? 'horizontal' : 'vertical')}
             title="Toggle layout direction"
-            className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             {layoutDirection === 'vertical' ? '↕ Vertical' : '↔ Horizontal'}
           </button>
@@ -465,42 +488,64 @@ export default function CenterCanvas({
             id="toolbar-btn-new-flowchart"
             onClick={() => setShowConfirmModal(true)}
             title="Start an empty flowchart"
-            className="px-3 py-1.5 border border-red-200 dark:border-red-900 hover:border-red-350 dark:hover:border-red-700 text-red-650 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-2.5 py-1.5 border border-red-200 dark:border-red-900 hover:border-red-350 dark:hover:border-red-700 text-red-650 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <FilePlus className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
             New
           </button>
 
-          <div className="h-4 w-px bg-gray-200 dark:bg-slate-600 mx-1"></div>
+          <div className="h-4 w-px bg-gray-200 dark:bg-slate-600 mx-0.5"></div>
 
-          <button
-            id="toolbar-btn-export-png"
-            onClick={handleExportPNG}
-            className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <FileImage className="w-3.5 h-3.5" />
-            Export PNG
-          </button>
+          {/* Unified Sleek Export Dropdown */}
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              id="toolbar-btn-export-menu"
+              onClick={() => setShowExportMenu((prev) => !prev)}
+              title="Export diagram in various formats"
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-150 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${showExportMenu ? 'rotate-180' : ''}`} />
+            </button>
 
-          <button
-            id="toolbar-btn-export-pdf"
-            onClick={handleExportPDF}
-            className="px-3 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Export PDF
-          </button>
-
-          <button
-            id="toolbar-btn-export-pptx"
-            onClick={handleExportPPTX}
-            title="Export full premium presentation blueprint"
-            className="px-4 py-1.8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-150 hover:scale-[1.02] cursor-pointer"
-          >
-            <Presentation className="w-4 h-4" />
-            <Sparkles className="w-3 h-3 fill-white/20 animate-pulse text-indigo-200" />
-            Export PPTX
-          </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  onClick={() => { handleExportPNG(); setShowExportMenu(false); }}
+                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <FileImage className="w-4 h-4 text-indigo-500" />
+                  <span>Export PNG Image</span>
+                </button>
+                <button
+                  onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
+                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 text-rose-500" />
+                  <span>Export PDF Document</span>
+                </button>
+                <button
+                  onClick={() => { handleExportPPTX(); setShowExportMenu(false); }}
+                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Presentation className="w-4 h-4 text-amber-500" />
+                  <span className="flex items-center gap-1">
+                    Export PPTX
+                    <Sparkles className="w-3 h-3 text-amber-500 fill-amber-200 animate-pulse" />
+                  </span>
+                </button>
+                <div className="my-1 border-t border-gray-100 dark:border-slate-700"></div>
+                <button
+                  onClick={() => { onExportJSON(); setShowExportMenu(false); }}
+                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-emerald-500" />
+                  <span>Export JSON Blueprint</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -873,6 +918,60 @@ export default function CenterCanvas({
                 className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-sm shadow-red-100 hover:scale-[1.02] active:scale-98 transition-all cursor-pointer"
               >
                 Start New
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showShortcutsHelp && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 max-w-md w-full p-6 transform transition-all scale-100">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-slate-700">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                  <Keyboard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100">Keyboard Shortcuts</h3>
+                  <p className="text-[11px] text-gray-400 dark:text-slate-400">Power-user efficiency cheatsheet</p>
+                </div>
+              </div>
+              <button
+                onClick={onToggleShortcutsHelp}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-2.5 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              {[
+                { key: 'Delete / Backspace', desc: 'Delete selected block' },
+                { key: 'Ctrl + A / Cmd + A', desc: 'Select top / root block' },
+                { key: 'Ctrl + D / Cmd + D', desc: 'Duplicate selected block' },
+                { key: 'Ctrl + S / Cmd + S', desc: 'Save workspace state' },
+                { key: 'Escape', desc: 'Deselect block & clear focus' },
+                { key: 'Tab / Shift + Tab', desc: 'Cycle selection forward / backward' },
+                { key: 'Arrow Keys', desc: 'Navigate connected diagram paths' },
+                { key: 'Shift + ?', desc: 'Toggle shortcuts help dialog' },
+              ].map((s) => (
+                <div key={s.key} className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-slate-700/60">
+                  <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">{s.desc}</span>
+                  <kbd className="px-2 py-1 bg-white dark:bg-slate-800 text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-300 border border-gray-200 dark:border-slate-600 rounded-md shadow-xs">
+                    {s.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 dark:border-slate-700 text-center">
+              <button
+                onClick={onToggleShortcutsHelp}
+                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+              >
+                Got it
               </button>
             </div>
           </div>
