@@ -12,6 +12,29 @@ export const ROW_HEIGHT = 150;
 export const DIAMOND_SIZE = 92;
 export const DIAMOND_HALF_DIAG = 65;
 
+/**
+ * Finds the true root block of the flowchart (a block with no incoming connections).
+ * Prefers 'terminator' type nodes (e.g. 'Start') if multiple roots exist.
+ */
+export function findRootBlock(blocks: Block[]): Block | null {
+  if (blocks.length === 0) return null;
+
+  const targetIds = new Set<string>();
+  blocks.forEach((b) => {
+    if (b.targetId) targetIds.add(b.targetId);
+    if (b.yesTargetId) targetIds.add(b.yesTargetId);
+    if (b.noTargetId) targetIds.add(b.noTargetId);
+  });
+
+  const roots = blocks.filter((b) => !targetIds.has(b.id));
+  if (roots.length > 0) {
+    const terminatorRoot = roots.find((b) => b.type === 'terminator');
+    return terminatorRoot || roots[0];
+  }
+
+  return blocks[0];
+}
+
 
 /**
  * Automatically calculates visual X and Y layout coordinates for a list of blocks.

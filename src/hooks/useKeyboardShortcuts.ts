@@ -5,11 +5,13 @@
 
 import { useEffect } from 'react';
 import { Block } from '../types';
+import { findRootBlock } from '../utils/layout';
 
 interface UseKeyboardShortcutsProps {
   blocks: Block[];
   selectedBlockId: string | null;
   currentWorkspace: string;
+  showShortcutsHelp?: boolean;
   onSelectBlock: (id: string | null) => void;
   onDeleteBlock: (id: string) => void;
   onDuplicateBlock: (id: string) => void;
@@ -21,6 +23,7 @@ export function useKeyboardShortcuts({
   blocks,
   selectedBlockId,
   currentWorkspace,
+  showShortcutsHelp = false,
   onSelectBlock,
   onDeleteBlock,
   onDuplicateBlock,
@@ -28,30 +31,48 @@ export function useKeyboardShortcuts({
   onToggleShortcutsHelp,
 }: UseKeyboardShortcutsProps) {
   useEffect(() => {
+    const isInteractiveElement = (target: HTMLElement | null): boolean => {
+      if (!target) return false;
+      const tagName = target.tagName;
+      if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(tagName)) return true;
+      if (target.isContentEditable) return true;
+      if (
+        target.closest('button') ||
+        target.closest('a') ||
+        target.closest('[role="button"]') ||
+        target.closest('[role="dialog"]')
+      ) {
+        return true;
+      }
+      return false;
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      const isInput =
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable);
 
-      // Escape works everywhere to clear selection or blur input
+      // Escape key handler: close modal if open, blur input, or deselect block
       if (e.key === 'Escape') {
-        if (isInput) {
-          target.blur();
+        if (showShortcutsHelp) {
+          e.preventDefault();
+          onToggleShortcutsHelp();
+          return;
+        }
+        if (target && 'blur' in target && typeof (target as any).blur === 'function') {
+          (target as any).blur();
         }
         onSelectBlock(null);
         return;
       }
 
-      // Help Modal shortcut: Shift + ?
-      if (e.key === '?' && !isInput) {
+      // Help Modal shortcut: Shift + ? (or ?)
+      if (e.key === '?' && !target?.tagName?.match(/^(INPUT|TEXTAREA)$/i)) {
         e.preventDefault();
         onToggleShortcutsHelp();
         return;
       }
+
+      // If the shortcuts help modal is open, do not intercept other canvas navigation
+      if (showShortcutsHelp) return;
 
       // Save shortcut: Ctrl + S / Cmd + S
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -60,14 +81,15 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // If user is currently typing in a form input, skip other shortcuts
-      if (isInput) return;
+      // If user is focused on an interactive control (input, button, link, etc.), skip canvas shortcuts
+      if (isInteractiveElement(target)) return;
 
       // Select All / Focus Root: Ctrl + A / Cmd + A
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
         e.preventDefault();
-        if (blocks.length > 0) {
-          onSelectBlock(blocks[0].id);
+        const rootBlock = findRootBlock(blocks);
+        if (rootBlock) {
+          onSelectBlock(rootBlock.id);
         }
         return;
       }
@@ -90,14 +112,15 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // Tab / Shift+Tab: Cycle through blocks
+      // Tab / Shift+Tab: Cycle through blocks on canvas
       if (e.key === 'Tab') {
         if (blocks.length === 0) return;
         e.preventDefault();
 
         const currentIndex = blocks.findIndex((b) => b.id === selectedBlockId);
         if (currentIndex === -1) {
-          onSelectBlock(blocks[0].id);
+          const root = findRootBlock(blocks);
+          onSelectBlock(root ? root.id : blocks[0].id);
         } else {
           let nextIndex: number;
           if (e.shiftKey) {
@@ -116,7 +139,8 @@ export function useKeyboardShortcuts({
         e.preventDefault();
 
         if (!selectedBlockId) {
-          onSelectBlock(blocks[0].id);
+          const root = findRootBlock(blocks);
+          onSelectBlock(root ? root.id : blocks[0].id);
           return;
         }
 
@@ -126,26 +150,29 @@ export function useKeyboardShortcuts({
         if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
           // Move to downstream target
           if (currentBlock.type === 'decision') {
-            const nextId =
-              e.key === 'ArrowRight'
-                ? currentBlock.yesTargetId || currentBlock.noTargetId
-                : currentBlock.noTargetId || currentBlock.yesTargetId;
-            if (nextId) {
-              onSelectBlock(nextId);
+            const primaryId = e.key === 'ArrowRight' ? currentBlock.yesTargetId : currentBlock.noTargetId;
+            const secondaryId = e.key === 'ArrowRight' ? currentBlock.noTargetId : currentBlock.yesTargetId;
+
+            const validPrimary = primaryId && blocks.some((b) => b.id === primaryId) ? primaryId : null;
+            const validSecondary = secondaryId && blocks.some((b) => b.id === secondaryId) ? secondaryId : null;
+            const candidateId = validPrimary || validSecondary;
+
+            if (candidateId) {
+              onSelectBlock(candidateId);
               return;
             }
-          } else if (currentBlock.targetId) {
+          } else if (currentBlock.targetId && blocks.some((b) => b.id === currentBlock.targetId)) {
             onSelectBlock(currentBlock.targetId);
             return;
           }
 
-          // Fallback to next block in array if no explicit graph link
+          // Fallback to next block in array if no valid graph link
           const idx = blocks.findIndex((b) => b.id === selectedBlockId);
           if (idx !== -1 && idx < blocks.length - 1) {
             onSelectBlock(blocks[idx + 1].id);
           }
         } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-          // Move to upstream parent node (node that points to currentBlock.id)
+          // Move to upstream parent node
           const parent = blocks.find(
             (b) =>
               b.targetId === currentBlock.id ||
@@ -175,6 +202,7 @@ export function useKeyboardShortcuts({
     blocks,
     selectedBlockId,
     currentWorkspace,
+    showShortcutsHelp,
     onSelectBlock,
     onDeleteBlock,
     onDuplicateBlock,

@@ -255,24 +255,32 @@ export default function App() {
 
   // Duplicate block (Ctrl+D / Cmd+D)
   const handleDuplicateBlock = (id: string) => {
-    const original = blocks.find((b) => b.id === id);
-    if (!original) return;
+    const targetBlock = blocks.find((b) => b.id === id);
+    if (!targetBlock) return;
 
     const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
-    const duplicatedBlock: Block = {
-      ...original,
-      id: newId,
-      label: `${original.label} (Copy)`,
-    };
+    let canAcceptChild = false;
 
     setBlocks((prev) => {
       const idx = prev.findIndex((b) => b.id === id);
-      if (idx === -1) return [...prev, duplicatedBlock];
+      if (idx === -1) return prev;
+
+      const currentOriginal = prev[idx];
+      const duplicatedBlock: Block = {
+        ...currentOriginal,
+        id: newId,
+        label: `${currentOriginal.label} (Copy)`,
+      };
+
+      canAcceptChild =
+        currentOriginal.type !== 'decision' ||
+        !currentOriginal.yesTargetId ||
+        !currentOriginal.noTargetId;
 
       const updated = [...prev];
-      if (original.type !== 'decision') {
-        duplicatedBlock.targetId = original.targetId;
-        updated[idx] = { ...original, targetId: newId };
+      if (currentOriginal.type !== 'decision') {
+        duplicatedBlock.targetId = currentOriginal.targetId;
+        updated[idx] = { ...currentOriginal, targetId: newId };
       }
 
       updated.splice(idx + 1, 0, duplicatedBlock);
@@ -280,8 +288,12 @@ export default function App() {
     });
 
     setSelectedBlockId(newId);
-    setActiveParentId(newId);
-    showToast(`Duplicated "${original.label}"`, 'success');
+    if (canAcceptChild) {
+      setActiveParentId(newId);
+    } else {
+      setActiveParentId(null);
+    }
+    showToast(`Duplicated "${targetBlock.label}"`, 'success');
   };
 
   // Select and chain next process block
@@ -321,6 +333,7 @@ export default function App() {
     blocks,
     selectedBlockId,
     currentWorkspace,
+    showShortcutsHelp,
     onSelectBlock: setSelectedBlockId,
     onDeleteBlock: handleDeleteBlock,
     onDuplicateBlock: handleDuplicateBlock,
