@@ -169,6 +169,8 @@ export default function CenterCanvas({
 
   // Determine bounds of the layout to ensure the canvas scroll area fits all nodes comfortably
   // Set minimum height and width larger than standard viewports to guarantee spacious scroll bounds
+  const minWidth = 1200;
+  const minHeight = 800;
   let minLayoutX = 0;
   let minLayoutY = 0;
   let maxLayoutX = minWidth;
@@ -855,23 +857,23 @@ export default function CenterCanvas({
             </div>
 
             {/* Float Zoom and Pan Control HUD Panel */}
-            <div className="zoom-controls absolute bottom-6 right-6 flex items-center gap-2 bg-white px-3 py-2 rounded-xl shadow-lg border border-gray-150 z-20 select-none">
+            <div className="zoom-controls absolute bottom-6 right-6 flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-xl shadow-lg border border-gray-150 z-20 select-none">
               <button
                 onClick={() => setScale(prev => Math.max(0.25, parseFloat((prev - 0.1).toFixed(2))))}
                 disabled={scale <= 0.25}
                 title="Zoom Out"
-                className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 hover:border-gray-350 text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 dark:border-gray-700 hover:border-gray-350 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
                 <ZoomOut className="w-4 h-4" />
               </button>
-              <span className="text-xs font-mono font-bold text-gray-600 min-w-[48px] text-center">
+              <span className="text-xs font-mono font-bold text-gray-600 dark:text-gray-400 min-w-[48px] text-center">
                 {Math.round(scale * 100)}%
               </span>
               <button
                 onClick={() => setScale(prev => Math.min(3, parseFloat((prev + 0.1).toFixed(2))))}
                 disabled={scale >= 3}
                 title="Zoom In"
-                className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 hover:border-gray-350 text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 dark:border-gray-700 hover:border-gray-350 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
                 <ZoomIn className="w-4 h-4" />
               </button>
@@ -894,16 +896,16 @@ export default function CenterCanvas({
       {/* Confirmation Dialog Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 max-w-sm w-full mx-4 transform transition-all scale-100">
-            <h3 className="text-sm font-bold text-gray-900 mb-2">New Flowchart Confirmation</h3>
-            <p className="text-xs text-gray-500 leading-relaxed mb-6">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 p-6 max-w-sm w-full mx-4 transform transition-all scale-100">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">New Flowchart Confirmation</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-6">
               Start a new flowchart? Current work will be lost.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
                 id="btn-confirm-cancel"
                 onClick={() => setShowConfirmModal(false)}
-                className="px-3.5 py-2 border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-xs font-semibold text-gray-600 hover:text-gray-900 rounded-lg transition-all cursor-pointer"
+                className="px-3.5 py-2 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-lg transition-all cursor-pointer"
               >
                 Cancel
               </button>

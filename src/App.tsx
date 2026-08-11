@@ -9,6 +9,7 @@ import CenterCanvas from './components/CenterCanvas';
 import RightSidebar from './components/RightSidebar';
 import Toast from './components/Toast';
 import { Block, ToastConfig, LayoutDirection } from './types';
+import { useDarkMode } from './utils/useDarkMode';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 // Default blueprint layout tracking
@@ -82,6 +83,7 @@ const isValidWorkspaceBlocks = (blocks: any): blocks is Block[] => {
 };
 
 export default function App() {
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [blocks, setBlocks] = useState<Block[]>(initialDemoBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>('demo-1');
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
@@ -124,40 +126,7 @@ export default function App() {
     } catch {}
   }, []);
 
-  // Dark mode state
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    let initialDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    try {
-      const saved = localStorage.getItem('flowforge_dark_mode');
-      if (saved) initialDark = saved === 'true';
-    } catch {
-      // Ignore storage errors
-    }
-    
-    // Apply class pre-paint
-    if (initialDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    return initialDark;
-  });
 
-  useEffect(() => {
-    // Preserve ongoing theme synchronization after mount
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    try {
-      localStorage.setItem('flowforge_dark_mode', String(isDarkMode));
-    } catch {
-      // Ignore storage errors
-    }
-  }, [isDarkMode]);
-
-  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
