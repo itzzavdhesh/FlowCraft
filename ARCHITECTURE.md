@@ -1,6 +1,6 @@
 # FlowCraft Architecture
 
-FlowCraft is a high-performance, web-based flowchart builder. It features a React-driven dynamic canvas, an intuitive drag-and-drop workspace, automatic topological layout processing, and persistent workspaces stored securely in local storage.
+FlowCraft is a high-performance, web-based flowchart builder. It features a React-driven dynamic canvas, an intuitive drag-and-drop workspace, automatic topological layout processing, and persistent workspaces stored in the browser's `localStorage`. Note: `localStorage` data is **not encrypted** and should not be treated as a security boundary — it is intended solely for user convenience across browser sessions.
 
 ## Core Technologies
 
@@ -18,7 +18,7 @@ The system is organized into a modular component tree centered around a flexible
 The `App` component acts as the global state container, managing:
 - `blocks`: The master list of nodes (terminators, processes, decisions, IO).
 - `workspaces`: Managing multiple saved diagrams (auto-persisted in `localStorage`).
-- **Undo/Redo History Stack**: Tracks structural changes for seamless reversal (`past` and `future` states).
+- **Undo/Redo History Stack**: Tracks graph state changes (including label edits, connection updates, and block additions/deletions) for seamless reversal via `pushState()` (`past` and `future` state arrays).
 - **Theme Settings**: Persisted dark mode settings and auto-detection.
 
 ### 2. Layout Engine (`utils/layout.ts`)
@@ -65,6 +65,8 @@ sequenceDiagram
 ```
 
 State is saved to the browser's `localStorage` under the key `flowforge_workspaces`. Changes are automatically synchronized on every graph mutation to prevent accidental data loss.
+
+**Legacy migration:** If `flowforge_workspaces` is absent (first load on an older installation), the app reads and validates the legacy `flowforge_save` key, migrates its contents into a default "Form-Flow Sandbox" workspace, and writes the result to `flowforge_workspaces` for all future reads.
 
 ## Future Enhancements
 - Real-time multiplayer collaboration (WebSockets / WebRTC)
