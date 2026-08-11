@@ -195,7 +195,7 @@ export default function CenterCanvas({
       const rect = containerRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left - pan.x) / scale;
       const y = (e.clientY - rect.top - pan.y) / scale;
-      socket.emit('cursor-move', { x, y });
+      socket.volatile.emit('cursor-move', { x, y });
       lastEmit.current = now;
     }
 
@@ -241,10 +241,12 @@ export default function CenterCanvas({
 
   // Determine bounds of the layout to ensure the canvas scroll area fits all nodes comfortably
   // Set minimum height and width larger than standard viewports to guarantee spacious scroll bounds
+  const MIN_WIDTH = 3000;
+  const MIN_HEIGHT = 2000;
   let minLayoutX = 0;
   let minLayoutY = 0;
-  let maxLayoutX = minWidth;
-  let maxLayoutY = minHeight;
+  let maxLayoutX = MIN_WIDTH;
+  let maxLayoutY = MIN_HEIGHT;
 
   nodes.forEach(node => {
     minLayoutX = Math.min(minLayoutX, node.x);
@@ -312,8 +314,8 @@ export default function CenterCanvas({
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      const canvasWidth = canvasRef.current.clientWidth || minWidth;
-      const canvasHeight = canvasRef.current.clientHeight || minHeight;
+      const canvasWidth = canvasRef.current.clientWidth || 3000;
+      const canvasHeight = canvasRef.current.clientHeight || 2000;
       const ratio = Math.min(pdfWidth / canvasWidth, pdfHeight / canvasHeight);
 
       const width = canvasWidth * ratio;

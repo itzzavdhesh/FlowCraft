@@ -18,6 +18,40 @@ const io = new Server(httpServer, {
 // Map<workspaceId, { blocks: Block[] }>
 const workspaces = new Map();
 
+const isValidWorkspaceBlocks = (blocks) => {
+  if (!Array.isArray(blocks)) return false;
+  
+  const idSet = new Set();
+  
+  const shapeValid = blocks.every(b => {
+    if (!b || typeof b !== 'object') return false;
+    
+    if (typeof b.id !== 'string' || b.id.trim() === '') return false;
+    if (typeof b.label !== 'string') return false;
+    if (!['terminator', 'process', 'decision', 'io'].includes(b.type)) return false;
+    
+    if (idSet.has(b.id)) return false;
+    idSet.add(b.id);
+    
+    if (b.targetId !== undefined && typeof b.targetId !== 'string') return false;
+    if (b.yesLabel !== undefined && typeof b.yesLabel !== 'string') return false;
+    if (b.noLabel !== undefined && typeof b.noLabel !== 'string') return false;
+    if (b.yesTargetId !== undefined && typeof b.yesTargetId !== 'string') return false;
+    if (b.noTargetId !== undefined && typeof b.noTargetId !== 'string') return false;
+    
+    return true;
+  });
+
+  if (!shapeValid) return false;
+
+  return blocks.every(b => {
+    if (b.targetId && !idSet.has(b.targetId)) return false;
+    if (b.yesTargetId && !idSet.has(b.yesTargetId)) return false;
+    if (b.noTargetId && !idSet.has(b.noTargetId)) return false;
+    return true;
+  });
+};
+
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
@@ -57,6 +91,7 @@ io.on('connection', (socket) => {
     if (!currentRoom) return;
     const roomState = workspaces.get(currentRoom);
     if (roomState) {
+      if (!isValidWorkspaceBlocks([...roomState.blocks, block])) return;
       roomState.blocks.push(block);
       socket.to(currentRoom).emit('block-added', block);
     }
@@ -66,7 +101,16 @@ io.on('connection', (socket) => {
     if (!currentRoom) return;
     const roomState = workspaces.get(currentRoom);
     if (roomState) {
+      let newState;
       const idx = roomState.blocks.findIndex(b => b.id === block.id);
+      if (idx !== -1) {
+        newState = [...roomState.blocks];
+        newState[idx] = block;
+      } else {
+        newState = [...roomState.blocks, block];
+      }
+      if (!isValidWorkspaceBlocks(newState)) return;
+
       if (idx !== -1) {
         roomState.blocks[idx] = block;
       } else {
@@ -106,6 +150,7 @@ io.on('connection', (socket) => {
     if (!currentRoom) return;
     const roomState = workspaces.get(currentRoom);
     if (roomState) {
+      if (!isValidWorkspaceBlocks(blocks)) return;
       roomState.blocks = blocks;
       socket.to(currentRoom).emit('full-sync-update', blocks);
     }
