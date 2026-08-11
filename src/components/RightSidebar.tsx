@@ -30,7 +30,7 @@ export default function RightSidebar({
 
   if (!selectedBlock) {
     return (
-      <aside className="w-[260px] h-full bg-white dark:bg-slate-800 border-l border-gray-100 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center p-6 text-center shrink-0 select-none">
+      <aside className="w-[260px] h-full bg-white dark:bg-slate-800 border-l border-gray-100 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center p-6 text-center shrink-0 select-none z-20 relative">
         <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-slate-900 flex items-center justify-center text-gray-300 dark:text-slate-600 mb-3 border border-dashed border-gray-200 dark:border-slate-700">
           <Link className="w-6 h-6" />
         </div>
@@ -75,7 +75,7 @@ export default function RightSidebar({
   };
 
   return (
-    <aside className="w-[260px] h-full bg-white dark:bg-slate-800 border-l border-gray-100 dark:border-slate-700 shadow-sm flex flex-col justify-between shrink-0 select-none overflow-hidden">
+    <aside className="w-[260px] h-full bg-white dark:bg-slate-800 border-l border-gray-100 dark:border-slate-700 shadow-sm flex flex-col justify-between shrink-0 select-none overflow-hidden z-20 relative">
       <div className="p-5 border-b border-gray-105 dark:border-slate-700">
         <h2 id="right-sidebar-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-3">Block Properties</h2>
         
