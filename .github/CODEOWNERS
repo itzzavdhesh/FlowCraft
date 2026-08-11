@@ -1,0 +1,10 @@
+# This is a list of CODEOWNERS.
+# They are automatically requested for review when someone opens a pull request.
+
+# Default owners for everything in the repo.
+*       @itzzavdhesh @rohitkumarnaidu
+
+# In the future, specific directories or files can be assigned to different teams or individuals.
+# Example:
+# /docs/  @docs-team
+# *.js    @js-owner
