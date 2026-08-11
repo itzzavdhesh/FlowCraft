@@ -91,6 +91,18 @@ export default function App() {
   const [workspaces, setWorkspaces] = useState<string[]>(['Form-Flow Sandbox']);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
+  // Auto-save
+  useEffect(() => {
+    if (currentWorkspace && workspaces.includes(currentWorkspace)) {
+      try {
+        const data = localStorage.getItem('flowforge_workspaces');
+        const parsed = data ? JSON.parse(data) : {};
+        parsed[currentWorkspace] = blocks;
+        localStorage.setItem('flowforge_workspaces', JSON.stringify(parsed));
+      } catch {}
+    }
+  }, [blocks, currentWorkspace, workspaces]);
+
   useEffect(() => {
     try {
       const data = localStorage.getItem('flowforge_workspaces');
