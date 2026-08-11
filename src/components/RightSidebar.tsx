@@ -28,6 +28,16 @@ export default function RightSidebar({
   const yesTargetSelectId = useId();
   const noTargetSelectId = useId();
 
+  // localLabel must be declared before any early returns to satisfy Rules of Hooks
+  const [localLabel, setLocalLabel] = useState('');
+
+  // Sync local label state when the selected block changes
+  useEffect(() => {
+    if (selectedBlock) {
+      setLocalLabel(selectedBlock.label);
+    }
+  }, [selectedBlock?.id, selectedBlock?.label]);
+
   if (!selectedBlock) {
     return (
       <aside className="w-[260px] h-full bg-white dark:bg-slate-800 border-l border-gray-100 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center p-6 text-center shrink-0 select-none z-20 relative">
@@ -36,7 +46,7 @@ export default function RightSidebar({
         </div>
         <h3 className="text-xs font-bold text-gray-700 dark:text-slate-300 tracking-tight">Inspect Properties</h3>
         <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1 max-w-[180px] leading-normal">
-          Select a block from the list or canvas to edit its properties & routing
+          Select a block from the list or canvas to edit its properties &amp; routing
         </p>
       </aside>
     );
@@ -57,15 +67,6 @@ export default function RightSidebar({
         return 'bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 text-xs font-semibold skew-x-[-5deg] inline-block';
     }
   };
-
-  const [localLabel, setLocalLabel] = useState('');
-
-  // Sync local state when the selected block changes
-  useEffect(() => {
-    if (selectedBlock) {
-      setLocalLabel(selectedBlock.label);
-    }
-  }, [selectedBlock?.id, selectedBlock?.label]);
 
   const handleLabelChange = (val: string) => {
     setLocalLabel(val);

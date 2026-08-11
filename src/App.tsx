@@ -108,6 +108,10 @@ export default function App() {
     setPast(newPast);
     setFuture([blocks, ...future]);
     setBlocks(previous);
+    // Clear activeParentId if the block it references was removed by this undo
+    if (activeParentId && !previous.some((b) => b.id === activeParentId)) {
+      setActiveParentId(null);
+    }
   };
 
   const redo = () => {
@@ -117,7 +121,12 @@ export default function App() {
     setFuture(newFuture);
     setPast([...past, blocks]);
     setBlocks(next);
+    // Clear activeParentId if the block it references no longer exists after redo
+    if (activeParentId && !next.some((b) => b.id === activeParentId)) {
+      setActiveParentId(null);
+    }
   };
+
 
   useEffect(() => {
     try {

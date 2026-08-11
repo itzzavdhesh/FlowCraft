@@ -64,6 +64,10 @@ export function useKeyboardShortcuts({
         return;
       }
 
+      // If user is currently typing in a form input, skip global shortcuts
+      // (allows Ctrl+Z / Ctrl+Y to use browser-native text field undo/redo)
+      if (isInput) return;
+
       // Undo shortcut: Ctrl + Z / Cmd + Z
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -77,9 +81,6 @@ export function useKeyboardShortcuts({
         onRedo();
         return;
       }
-
-      // If user is currently typing in a form input, skip other shortcuts
-      if (isInput) return;
 
       // Select All / Focus Root: Ctrl + A / Cmd + A
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
