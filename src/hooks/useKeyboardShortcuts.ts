@@ -15,6 +15,8 @@ interface UseKeyboardShortcutsProps {
   onDuplicateBlock: (id: string) => void;
   onSaveWorkspace: (name: string) => void;
   onToggleShortcutsHelp: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 export function useKeyboardShortcuts({
@@ -26,6 +28,8 @@ export function useKeyboardShortcuts({
   onDuplicateBlock,
   onSaveWorkspace,
   onToggleShortcutsHelp,
+  onUndo,
+  onRedo,
 }: UseKeyboardShortcutsProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,6 +61,20 @@ export function useKeyboardShortcuts({
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         onSaveWorkspace(currentWorkspace || 'Form-Flow Sandbox');
+        return;
+      }
+
+      // Undo shortcut: Ctrl + Z / Cmd + Z
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        onUndo();
+        return;
+      }
+
+      // Redo shortcut: Ctrl + Y / Cmd + Y OR Ctrl + Shift + Z
+      if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        onRedo();
         return;
       }
 
@@ -180,5 +198,7 @@ export function useKeyboardShortcuts({
     onDuplicateBlock,
     onSaveWorkspace,
     onToggleShortcutsHelp,
+    onUndo,
+    onRedo,
   ]);
 }

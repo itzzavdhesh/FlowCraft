@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useId } from 'react';
+import React, { useId, useState, useEffect } from 'react';
 import { Trash2, Link, CornerDownRight, ArrowRight, CornerRightDown } from 'lucide-react';
 import { Block, ShapeType } from '../types';
 
@@ -58,8 +58,29 @@ export default function RightSidebar({
     }
   };
 
+  const [localLabel, setLocalLabel] = useState('');
+
+  // Sync local state when the selected block changes
+  useEffect(() => {
+    if (selectedBlock) {
+      setLocalLabel(selectedBlock.label);
+    }
+  }, [selectedBlock?.id, selectedBlock?.label]);
+
   const handleLabelChange = (val: string) => {
-    onUpdateBlock({ ...selectedBlock, label: val });
+    setLocalLabel(val);
+  };
+
+  const handleLabelBlur = () => {
+    if (selectedBlock && localLabel !== selectedBlock.label) {
+      onUpdateBlock({ ...selectedBlock, label: localLabel });
+    }
+  };
+
+  const handleLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    }
   };
 
   const handleTargetChange = (val: string) => {
@@ -107,8 +128,10 @@ export default function RightSidebar({
           <input
             id={labelInputId}
             type="text"
-            value={selectedBlock.label}
+            value={localLabel}
             onChange={(e) => handleLabelChange(e.target.value)}
+            onBlur={handleLabelBlur}
+            onKeyDown={handleLabelKeyDown}
             className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 font-sans font-medium focus:ring-1 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-gray-50/50 dark:bg-slate-900/50 hover:bg-gray-50/20 dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-800 text-gray-900 dark:text-slate-100"
           />
         </div>

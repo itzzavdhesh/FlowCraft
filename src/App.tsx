@@ -91,6 +91,34 @@ export default function App() {
   const [workspaces, setWorkspaces] = useState<string[]>(['Form-Flow Sandbox']);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
+  // Undo/Redo state
+  const [past, setPast] = useState<Block[][]>([]);
+  const [future, setFuture] = useState<Block[][]>([]);
+
+  const pushState = (newBlocks: Block[]) => {
+    setPast((p) => [...p, blocks]);
+    setFuture([]);
+    setBlocks(newBlocks);
+  };
+
+  const undo = () => {
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    const newPast = past.slice(0, past.length - 1);
+    setPast(newPast);
+    setFuture([blocks, ...future]);
+    setBlocks(previous);
+  };
+
+  const redo = () => {
+    if (future.length === 0) return;
+    const next = future[0];
+    const newFuture = future.slice(1);
+    setFuture(newFuture);
+    setPast([...past, blocks]);
+    setBlocks(next);
+  };
+
   useEffect(() => {
     try {
       const data = localStorage.getItem('flowforge_workspaces');
@@ -177,9 +205,8 @@ export default function App() {
   const handleAddBlock = (blockData: Omit<Block, 'id'>) => {
     const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
 
-    setBlocks((prev) => {
-      let updated = [...prev];
-      let insertedTargetId: string | undefined = undefined;
+    let updated = [...blocks];
+    let insertedTargetId: string | undefined = undefined;
 
       if (activeParentId) {
         const activeIdx = updated.findIndex((b) => b.id === activeParentId);
@@ -209,8 +236,7 @@ export default function App() {
         targetId: insertedTargetId,
       };
 
-      return [...updated, newBlock];
-    });
+      pushState([...updated, newBlock]);
 
     // Automatically set the new block as the active parent for sequential additions
     setActiveParentId(newId);
@@ -222,7 +248,7 @@ export default function App() {
 
   // Update node details (Right panel)
   const handleUpdateBlock = (updatedBlock: Block) => {
-    setBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
+    pushState(blocks.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
   };
 
   // Delete block
@@ -230,19 +256,19 @@ export default function App() {
     const block = blocks.find((b) => b.id === id);
     if (!block) return;
 
-    setBlocks((prev) => {
-      // Filter out deleted block
-      let updated = prev.filter((b) => b.id !== id);
+    // Filter out deleted block
+    let updated = blocks.filter((b) => b.id !== id);
 
-      // Clean up references to this deleted block from other blocks
-      return updated.map((b) => {
-        const next = { ...b };
-        if (next.targetId === id) next.targetId = '';
-        if (next.yesTargetId === id) next.yesTargetId = '';
-        if (next.noTargetId === id) next.noTargetId = '';
-        return next;
-      });
+    // Clean up references to this deleted block from other blocks
+    const finalBlocks = updated.map((b) => {
+      const next = { ...b };
+      if (next.targetId === id) next.targetId = '';
+      if (next.yesTargetId === id) next.yesTargetId = '';
+      if (next.noTargetId === id) next.noTargetId = '';
+      return next;
     });
+
+    pushState(finalBlocks);
 
     if (selectedBlockId === id) {
       setSelectedBlockId(null);
@@ -265,19 +291,20 @@ export default function App() {
       label: `${original.label} (Copy)`,
     };
 
-    setBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === id);
-      if (idx === -1) return [...prev, duplicatedBlock];
+    const idx = blocks.findIndex((b) => b.id === id);
+    if (idx === -1) {
+      pushState([...blocks, duplicatedBlock]);
+      return;
+    }
 
-      const updated = [...prev];
-      if (original.type !== 'decision') {
-        duplicatedBlock.targetId = original.targetId;
-        updated[idx] = { ...original, targetId: newId };
-      }
+    const updated = [...blocks];
+    if (original.type !== 'decision') {
+      duplicatedBlock.targetId = original.targetId;
+      updated[idx] = { ...original, targetId: newId };
+    }
 
-      updated.splice(idx + 1, 0, duplicatedBlock);
-      return updated;
-    });
+    updated.splice(idx + 1, 0, duplicatedBlock);
+    pushState(updated);
 
     setSelectedBlockId(newId);
     setActiveParentId(newId);
@@ -326,6 +353,8 @@ export default function App() {
     onDuplicateBlock: handleDuplicateBlock,
     onSaveWorkspace: handleSaveWorkspace,
     onToggleShortcutsHelp: () => setShowShortcutsHelp((prev) => !prev),
+    onUndo: undo,
+    onRedo: redo,
   });
 
   const handleLoadWorkspace = (name: string) => {
@@ -339,6 +368,8 @@ export default function App() {
             return;
           }
           setBlocks(parsed[name]);
+          setPast([]);
+          setFuture([]);
           setCurrentWorkspace(name);
           setSelectedBlockId(null);
           setActiveParentId(null);
@@ -424,6 +455,8 @@ export default function App() {
                 
                 // Only update React state after successfully persisting to localStorage
                 setBlocks(parsed);
+                setPast([]);
+                setFuture([]);
                 setSelectedBlockId(null);
                 setActiveParentId(null);
                 setWorkspaces([...currentKeys, newName]);
@@ -474,7 +507,7 @@ export default function App() {
   };
 
   const handleNewFlowchart = () => {
-    setBlocks([]);
+    pushState([]);
     setSelectedBlockId(null);
     setActiveParentId(null);
     showToast('Flowchart cleared. Canvas is ready!', 'info');
@@ -510,7 +543,7 @@ export default function App() {
         workspaces={workspaces}
         currentWorkspace={currentWorkspace}
         onAddFirstBlock={() => {
-          setBlocks(initialDemoBlocks);
+          pushState(initialDemoBlocks);
           setSelectedBlockId('demo-1');
           showToast('Loaded vertical flow template!');
         }}
