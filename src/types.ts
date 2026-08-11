@@ -12,9 +12,9 @@ export interface Block {
   label: string;
   targetId?: string; // For standard nodes (terminator, process, io)
   yesLabel?: string; // For decision nodes
-  noLabel?: string;  // For decision nodes
+  noLabel?: string; // For decision nodes
   yesTargetId?: string; // Target for "Yes" branch
-  noTargetId?: string;  // Target for "No" branch
+  noTargetId?: string; // Target for "No" branch
 }
 
 export interface CanvasNode {

@@ -12,18 +12,20 @@ export const ROW_HEIGHT = 150;
 export const DIAMOND_SIZE = 92;
 export const DIAMOND_HALF_DIAG = 65;
 
-
 /**
  * Automatically calculates visual X and Y layout coordinates for a list of blocks.
  * Uses BFS traversal of the connection graph to lay out flow branches.
  */
-export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirection = 'vertical'): CanvasNode[] {
+export function calculateLayout(
+  blocks: Block[],
+  layoutDirection: LayoutDirection = 'vertical',
+): CanvasNode[] {
   if (blocks.length === 0) return [];
 
   // 1. Identify roots and parents for each block
   const incomingMap = new Map<string, number>();
   const parentsMap = new Map<string, string[]>();
-  
+
   blocks.forEach((b) => {
     incomingMap.set(b.id, 0);
     parentsMap.set(b.id, []);
@@ -38,7 +40,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
     visited.add(nodeId);
     recursionStack.add(nodeId);
 
-    const block = blocks.find(b => b.id === nodeId);
+    const block = blocks.find((b) => b.id === nodeId);
     if (block) {
       const targets: string[] = [];
       if (block.type === 'decision') {
@@ -59,7 +61,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
     recursionStack.delete(nodeId);
   };
 
-  blocks.forEach(b => {
+  blocks.forEach((b) => {
     if (!visited.has(b.id)) {
       dfs(b.id);
     }
@@ -68,7 +70,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
   blocks.forEach((b) => {
     const addEdge = (childId: string, parentId: string) => {
       if (backEdges.has(`${parentId}->${childId}`)) return; // Ignore back-edges
-      
+
       incomingMap.set(childId, (incomingMap.get(childId) || 0) + 1);
       if (parentsMap.has(childId)) {
         parentsMap.get(childId)!.push(parentId);
@@ -85,7 +87,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
   // Find a good starting node (root with 0 incoming, or terminator, or just first node)
   let rootId = blocks[0].id;
   let minIncoming = Infinity;
-  
+
   // Prefer a root with 0 incoming edges
   for (const b of blocks) {
     const inc = incomingMap.get(b.id) || 0;
@@ -101,7 +103,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
 
   const layoutMap = new Map<string, { row: number; col: number }>();
   const occupied = new Set<string>();
-  const pending = new Set<string>(blocks.map(b => b.id));
+  const pending = new Set<string>(blocks.map((b) => b.id));
 
   let iterations = 0;
   const maxIterations = blocks.length * 10; // safety ceiling
@@ -113,7 +115,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
     for (const bId of pending) {
       const parents = parentsMap.get(bId) || [];
       // Check if all parents are already placed
-      const allParentsPlaced = parents.every(pId => layoutMap.has(pId));
+      const allParentsPlaced = parents.every((pId) => layoutMap.has(pId));
 
       if (allParentsPlaced && (parents.length > 0 || bId === rootId)) {
         placeBlock(bId, parents);
@@ -129,7 +131,10 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
       const firstBId = Array.from(pending)[0];
       if (firstBId) {
         const parents = parentsMap.get(firstBId) || [];
-        placeBlock(firstBId, parents.filter(pId => layoutMap.has(pId)));
+        placeBlock(
+          firstBId,
+          parents.filter((pId) => layoutMap.has(pId)),
+        );
         pending.delete(firstBId);
       }
     }
@@ -149,7 +154,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
 
   // Helper function to place an individual block
   function placeBlock(id: string, placedParents: string[]) {
-    const block = blocks.find(b => b.id === id);
+    const block = blocks.find((b) => b.id === id);
     if (!block) return;
 
     let row = 0;
@@ -164,8 +169,8 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
     } else if (placedParents.length === 1) {
       const pId = placedParents[0];
       const parentCoord = layoutMap.get(pId)!;
-      const parentBlock = blocks.find(b => b.id === pId);
-      
+      const parentBlock = blocks.find((b) => b.id === pId);
+
       if (parentBlock?.type === 'decision') {
         if (parentBlock.yesTargetId === id) {
           // YES BRANCH: Placed to the BOTTOM-RIGHT of the diamond
@@ -194,10 +199,10 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
       }
     } else if (placedParents.length > 1) {
       // REJOINING NODE: row is strictly max row of ALL parents + 1
-      const parentCoords = placedParents.map(pId => layoutMap.get(pId)!);
-      const maxParentRow = Math.max(...parentCoords.map(c => c.row));
+      const parentCoords = placedParents.map((pId) => layoutMap.get(pId)!);
+      const maxParentRow = Math.max(...parentCoords.map((c) => c.row));
       row = maxParentRow + 1;
-      
+
       // col is the average of parent columns (CENTER)
       const sumCols = parentCoords.reduce((sum, c) => sum + c.col, 0);
       col = Math.round(sumCols / parentCoords.length);
@@ -254,7 +259,10 @@ export interface SvgLine {
 /**
  * Calculates connection lines with beautiful bezier curves and arrow directions
  */
-export function calculateConnections(nodes: CanvasNode[], layoutDirection: LayoutDirection = 'vertical'): SvgLine[] {
+export function calculateConnections(
+  nodes: CanvasNode[],
+  layoutDirection: LayoutDirection = 'vertical',
+): SvgLine[] {
   const lines: SvgLine[] = [];
 
   // Identify shared target nodes (targeted by more than 1 block)
@@ -276,8 +284,9 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
     }
   });
 
-  const minX = nodes.length > 0 ? Math.min(...nodes.map(n => n.x)) : 0;
-  const maxX = nodes.length > 0 ? Math.max(...nodes.map(n => n.x + NODE_WIDTH)) : 0;
+  const minX = nodes.length > 0 ? Math.min(...nodes.map((n) => n.x)) : 0;
+  const maxX =
+    nodes.length > 0 ? Math.max(...nodes.map((n) => n.x + NODE_WIDTH)) : 0;
   const layoutBounds = { minX, maxX };
   const backwardLanes = { left: 0, right: 0 };
 
@@ -292,7 +301,18 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
       if (block.yesTargetId) {
         const target = nodes.find((n) => n.block.id === block.yesTargetId);
         if (target) {
-          lines.push(generateConnection(source, target, block.yesLabel || 'Yes', 'yes', sharedTargets.has(target.block.id), layoutDirection, layoutBounds, backwardLanes));
+          lines.push(
+            generateConnection(
+              source,
+              target,
+              block.yesLabel || 'Yes',
+              'yes',
+              sharedTargets.has(target.block.id),
+              layoutDirection,
+              layoutBounds,
+              backwardLanes,
+            ),
+          );
         } else {
           // If the target is set but somehow not in the nodes, treat as unconnected
           const startX = sourceCx + DIAMOND_HALF_DIAG;
@@ -336,7 +356,18 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
       if (block.noTargetId) {
         const target = nodes.find((n) => n.block.id === block.noTargetId);
         if (target) {
-          lines.push(generateConnection(source, target, block.noLabel || 'No', 'no', sharedTargets.has(target.block.id), layoutDirection, layoutBounds, backwardLanes));
+          lines.push(
+            generateConnection(
+              source,
+              target,
+              block.noLabel || 'No',
+              'no',
+              sharedTargets.has(target.block.id),
+              layoutDirection,
+              layoutBounds,
+              backwardLanes,
+            ),
+          );
         } else {
           // If the target is set but somehow not in the nodes, treat as unconnected
           const startX = sourceCx - DIAMOND_HALF_DIAG;
@@ -380,7 +411,18 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
       if (block.targetId) {
         const target = nodes.find((n) => n.block.id === block.targetId);
         if (target) {
-          lines.push(generateConnection(source, target, undefined, 'standard', sharedTargets.has(target.block.id), layoutDirection, layoutBounds, backwardLanes));
+          lines.push(
+            generateConnection(
+              source,
+              target,
+              undefined,
+              'standard',
+              sharedTargets.has(target.block.id),
+              layoutDirection,
+              layoutBounds,
+              backwardLanes,
+            ),
+          );
         }
       }
     }
@@ -397,7 +439,7 @@ function generateConnection(
   isSharedTarget: boolean = false,
   layoutDirection: LayoutDirection = 'vertical',
   layoutBounds: { minX: number; maxX: number } = { minX: 0, maxX: 0 },
-  backwardLanes: { left: number; right: number } = { left: 0, right: 0 }
+  backwardLanes: { left: number; right: number } = { left: 0, right: 0 },
 ): SvgLine {
   const isLoopback = target.y < source.y;
 
@@ -411,8 +453,8 @@ function generateConnection(
     const targetCy = target.y + NODE_HEIGHT / 2;
 
     const routeRight = isSourceDecision
-      ? (connectionType === 'yes')
-      : (source.col >= 0);
+      ? connectionType === 'yes'
+      : source.col >= 0;
 
     let startX = 0;
     let startY = 0;
@@ -432,7 +474,9 @@ function generateConnection(
     let endX = 0;
     let endY = 0;
     if (isTargetDecision) {
-      endX = routeRight ? targetCx + DIAMOND_HALF_DIAG : targetCx - DIAMOND_HALF_DIAG;
+      endX = routeRight
+        ? targetCx + DIAMOND_HALF_DIAG
+        : targetCx - DIAMOND_HALF_DIAG;
       endY = targetCy;
     } else {
       endX = routeRight ? target.x + NODE_WIDTH : target.x;
@@ -444,7 +488,7 @@ function generateConnection(
       : Math.min(source.x, target.x) - 50;
 
     const path = `M ${startX} ${startY} L ${bypassX} ${startY} L ${bypassX} ${endY} L ${endX} ${endY}`;
-    
+
     const labelX = startX + (routeRight ? 25 : -25);
     const labelY = startY - 10;
 
@@ -471,13 +515,22 @@ function generateConnection(
   const targetCx = target.x + NODE_WIDTH / 2;
   const targetCy = target.y + NODE_HEIGHT / 2;
 
-  let startX = 0, startY = 0, endX = 0, endY = 0, path = '', labelX = 0, labelY = 0;
-  const isBackward = layoutDirection === 'vertical' ? source.row >= target.row : source.col >= target.col;
+  let startX = 0,
+    startY = 0,
+    endX = 0,
+    endY = 0,
+    path = '',
+    labelX = 0,
+    labelY = 0;
+  const isBackward =
+    layoutDirection === 'vertical'
+      ? source.row >= target.row
+      : source.col >= target.col;
 
   if (layoutDirection === 'vertical') {
     startX = sourceCx;
     startY = source.y + NODE_HEIGHT;
-    
+
     if (isSourceDecision) {
       if (connectionType === 'yes') {
         startX = sourceCx + DIAMOND_HALF_DIAG;
@@ -556,7 +609,7 @@ function generateConnection(
       if (isSharedTarget && source.col !== target.col) {
         const midX = (sourceCx + targetCx) / 2;
         path = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
-        
+
         if (connectionType === 'yes') {
           labelX = startX + 25;
           labelY = startY - 10;
@@ -600,7 +653,7 @@ function generateConnection(
     // Horizontal Layout Mode
     startX = source.x + NODE_WIDTH;
     startY = sourceCy;
-    
+
     if (isSourceDecision) {
       if (connectionType === 'yes') {
         startX = sourceCx;
@@ -637,7 +690,7 @@ function generateConnection(
       if (isSharedTarget && source.col !== target.col) {
         const midY = (sourceCy + targetCy) / 2;
         path = `M ${startX} ${startY} L ${startX} ${midY} L ${endX} ${midY} L ${endX} ${endY}`;
-        
+
         if (connectionType === 'yes') {
           labelX = startX - 10;
           labelY = startY + 25;
@@ -686,7 +739,7 @@ function generateConnection(
     const ys = [];
     for (let i = 0; i < nums.length; i += 2) {
       xs.push(parseFloat(nums[i]));
-      ys.push(parseFloat(nums[i+1]));
+      ys.push(parseFloat(nums[i + 1]));
     }
     bounds = {
       minX: Math.min(...xs),

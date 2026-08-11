@@ -4,7 +4,13 @@
  */
 
 import React, { useId } from 'react';
-import { Trash2, Link, CornerDownRight, ArrowRight, CornerRightDown } from 'lucide-react';
+import {
+  Trash2,
+  Link,
+  CornerDownRight,
+  ArrowRight,
+  CornerRightDown,
+} from 'lucide-react';
 import { Block, ShapeType } from '../types';
 
 interface RightSidebarProps {
@@ -34,9 +40,12 @@ export default function RightSidebar({
         <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-slate-900 flex items-center justify-center text-gray-300 dark:text-slate-600 mb-3 border border-dashed border-gray-200 dark:border-slate-700">
           <Link className="w-6 h-6" />
         </div>
-        <h3 className="text-xs font-bold text-gray-700 dark:text-slate-300 tracking-tight">Inspect Properties</h3>
+        <h3 className="text-xs font-bold text-gray-700 dark:text-slate-300 tracking-tight">
+          Inspect Properties
+        </h3>
         <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1 max-w-[180px] leading-normal">
-          Select a block from the list or canvas to edit its properties & routing
+          Select a block from the list or canvas to edit its properties &
+          routing
         </p>
       </aside>
     );
@@ -77,8 +86,13 @@ export default function RightSidebar({
   return (
     <aside className="w-[260px] h-full bg-white dark:bg-slate-800 border-l border-gray-100 dark:border-slate-700 shadow-sm flex flex-col justify-between shrink-0 select-none overflow-hidden z-20 relative">
       <div className="p-5 border-b border-gray-105 dark:border-slate-700">
-        <h2 id="right-sidebar-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-3">Block Properties</h2>
-        
+        <h2
+          id="right-sidebar-title"
+          className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-3"
+        >
+          Block Properties
+        </h2>
+
         {/* Node type badge */}
         <div>
           <span className={getBadgeStyle(selectedBlock.type)}>
@@ -89,21 +103,25 @@ export default function RightSidebar({
 
       <div className="flex-grow p-5 space-y-4 overflow-y-auto custom-scrollbar">
         {/* Warning Indicator for Missing Decision connections */}
-        {selectedBlock.type === 'decision' && (
-          !selectedBlock.yesTargetId || 
-          selectedBlock.yesTargetId === selectedBlock.id || 
-          !selectedBlock.noTargetId || 
-          selectedBlock.noTargetId === selectedBlock.id
-        ) && (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] font-semibold tracking-wide flex items-start gap-1.5 leading-normal">
-            <span className="text-amber-600 shrink-0 select-none">⚠</span>
-            <span>Set Yes and No branch targets</span>
-          </div>
-        )}
+        {selectedBlock.type === 'decision' &&
+          (!selectedBlock.yesTargetId ||
+            selectedBlock.yesTargetId === selectedBlock.id ||
+            !selectedBlock.noTargetId ||
+            selectedBlock.noTargetId === selectedBlock.id) && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] font-semibold tracking-wide flex items-start gap-1.5 leading-normal">
+              <span className="text-amber-600 shrink-0 select-none">⚠</span>
+              <span>Set Yes and No branch targets</span>
+            </div>
+          )}
 
         {/* Label Field */}
         <div>
-          <label htmlFor={labelInputId} className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5 font-sans">Label</label>
+          <label
+            htmlFor={labelInputId}
+            className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5 font-sans"
+          >
+            Label
+          </label>
           <input
             id={labelInputId}
             type="text"
@@ -117,7 +135,10 @@ export default function RightSidebar({
         {selectedBlock.type === 'decision' ? (
           <div className="space-y-3 pt-2">
             <div>
-              <label htmlFor={yesTargetSelectId} className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-500 mb-1">
+              <label
+                htmlFor={yesTargetSelectId}
+                className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-500 mb-1"
+              >
                 <ArrowRight className="w-3.5 h-3.5" />
                 {selectedBlock.yesLabel || 'Yes'} Branch Target
               </label>
@@ -137,7 +158,10 @@ export default function RightSidebar({
             </div>
 
             <div>
-              <label htmlFor={noTargetSelectId} className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-500 mb-1">
+              <label
+                htmlFor={noTargetSelectId}
+                className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-500 mb-1"
+              >
                 <CornerRightDown className="w-3.5 h-3.5" />
                 {selectedBlock.noLabel || 'No'} Branch Target
               </label>
@@ -159,7 +183,10 @@ export default function RightSidebar({
         ) : (
           <div className="space-y-3 pt-2">
             <div>
-              <label htmlFor={targetSelectId} className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 mb-1">
+              <label
+                htmlFor={targetSelectId}
+                className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 mb-1"
+              >
                 <CornerDownRight className="w-3.5 h-3.5" />
                 Next Connect Block
               </label>

@@ -55,39 +55,48 @@ const initialDemoBlocks: Block[] = [
 
 const isValidWorkspaceBlocks = (blocks: any): blocks is Block[] => {
   if (!Array.isArray(blocks)) return false;
-  
+
   const idSet = new Set<string>();
-  
-  return blocks.every(b => {
+
+  return blocks.every((b) => {
     if (!b || typeof b !== 'object') return false;
-    
+
     // Core fields
     if (typeof b.id !== 'string' || b.id.trim() === '') return false;
     if (typeof b.label !== 'string') return false;
-    if (!['terminator', 'process', 'decision', 'io'].includes(b.type)) return false;
-    
+    if (!['terminator', 'process', 'decision', 'io'].includes(b.type))
+      return false;
+
     // Duplicate ID check
     if (idSet.has(b.id)) return false;
     idSet.add(b.id);
-    
+
     // Optional string fields
-    if (b.targetId !== undefined && typeof b.targetId !== 'string') return false;
-    if (b.yesLabel !== undefined && typeof b.yesLabel !== 'string') return false;
+    if (b.targetId !== undefined && typeof b.targetId !== 'string')
+      return false;
+    if (b.yesLabel !== undefined && typeof b.yesLabel !== 'string')
+      return false;
     if (b.noLabel !== undefined && typeof b.noLabel !== 'string') return false;
-    if (b.yesTargetId !== undefined && typeof b.yesTargetId !== 'string') return false;
-    if (b.noTargetId !== undefined && typeof b.noTargetId !== 'string') return false;
-    
+    if (b.yesTargetId !== undefined && typeof b.yesTargetId !== 'string')
+      return false;
+    if (b.noTargetId !== undefined && typeof b.noTargetId !== 'string')
+      return false;
+
     return true;
   });
 };
 
 export default function App() {
   const [blocks, setBlocks] = useState<Block[]>(initialDemoBlocks);
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>('demo-1');
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(
+    'demo-1',
+  );
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastConfig[]>([]);
-  const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('vertical');
-  const [currentWorkspace, setCurrentWorkspace] = useState<string>('Form-Flow Sandbox');
+  const [layoutDirection, setLayoutDirection] =
+    useState<LayoutDirection>('vertical');
+  const [currentWorkspace, setCurrentWorkspace] =
+    useState<string>('Form-Flow Sandbox');
   const [workspaces, setWorkspaces] = useState<string[]>(['Form-Flow Sandbox']);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
@@ -115,8 +124,13 @@ export default function App() {
         const oldData = localStorage.getItem('flowforge_save');
         if (oldData) {
           const parsed = JSON.parse(oldData);
-          const validBlocks = isValidWorkspaceBlocks(parsed) ? parsed : initialDemoBlocks;
-          localStorage.setItem('flowforge_workspaces', JSON.stringify({ 'Form-Flow Sandbox': validBlocks }));
+          const validBlocks = isValidWorkspaceBlocks(parsed)
+            ? parsed
+            : initialDemoBlocks;
+          localStorage.setItem(
+            'flowforge_workspaces',
+            JSON.stringify({ 'Form-Flow Sandbox': validBlocks }),
+          );
           setWorkspaces(['Form-Flow Sandbox']);
           setBlocks(validBlocks);
         }
@@ -133,7 +147,7 @@ export default function App() {
     } catch {
       // Ignore storage errors
     }
-    
+
     // Apply class pre-paint
     if (initialDark) {
       document.documentElement.classList.add('dark');
@@ -160,7 +174,10 @@ export default function App() {
   const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   // Function to push a toast
-  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+  const showToast = (
+    message: string,
+    type: 'success' | 'info' | 'error' = 'success',
+  ) => {
     const newToast: ToastConfig = {
       id: Math.random().toString(36).substring(2, 9),
       message,
@@ -222,7 +239,9 @@ export default function App() {
 
   // Update node details (Right panel)
   const handleUpdateBlock = (updatedBlock: Block) => {
-    setBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
+    setBlocks((prev) =>
+      prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)),
+    );
   };
 
   // Delete block
@@ -293,7 +312,12 @@ export default function App() {
   // Helper to validate workspace names consistently
   const isInvalidWorkspaceName = (name: string) => {
     const trimmed = name.trim();
-    return trimmed === '' || trimmed === '__proto__' || trimmed === 'constructor' || trimmed === 'prototype';
+    return (
+      trimmed === '' ||
+      trimmed === '__proto__' ||
+      trimmed === 'constructor' ||
+      trimmed === 'prototype'
+    );
   };
 
   // Persistent Local Storage hooks
@@ -360,16 +384,16 @@ export default function App() {
       const parsed = data ? JSON.parse(data) : {};
       delete parsed[name];
       localStorage.setItem('flowforge_workspaces', JSON.stringify(parsed));
-      
-      const updatedWorkspaces = workspaces.filter(w => w !== name);
+
+      const updatedWorkspaces = workspaces.filter((w) => w !== name);
       setWorkspaces(updatedWorkspaces);
-      
+
       if (currentWorkspace === name) {
         if (updatedWorkspaces.length > 0) {
-           handleLoadWorkspace(updatedWorkspaces[0]);
+          handleLoadWorkspace(updatedWorkspaces[0]);
         } else {
-           handleNewFlowchart();
-           setCurrentWorkspace('');
+          handleNewFlowchart();
+          setCurrentWorkspace('');
         }
       }
       showToast(`Workspace "${name}" deleted!`, 'info');
@@ -381,9 +405,9 @@ export default function App() {
   const handleExportJSON = () => {
     try {
       const fileContent = JSON.stringify(blocks, null, 2);
-      const blob = new Blob([fileContent], { type: "application/json" });
+      const blob = new Blob([fileContent], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const link = document.createElement('a');
       link.href = url;
       link.download = `${currentWorkspace}.json`;
       document.body.appendChild(link);
@@ -402,39 +426,48 @@ export default function App() {
       try {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content) as Block[];
-        
+
         if (isValidWorkspaceBlocks(parsed)) {
-            let baseName = file.name.replace('.json', '').trim();
-            if (!baseName) {
-                baseName = 'Imported Workspace';
-            }
-            let newName = baseName;
-            
-            const data = localStorage.getItem('flowforge_workspaces');
-            const parsedStorage = data ? JSON.parse(data) : {};
-            const currentKeys = Object.keys(parsedStorage);
-            
-            while (currentKeys.includes(newName) || isInvalidWorkspaceName(newName)) {
-                newName = `${baseName}-${Math.random().toString(36).substring(2, 6)}`;
-            }
-            
-            try {
-                parsedStorage[newName] = parsed;
-                localStorage.setItem('flowforge_workspaces', JSON.stringify(parsedStorage));
-                
-                // Only update React state after successfully persisting to localStorage
-                setBlocks(parsed);
-                setSelectedBlockId(null);
-                setActiveParentId(null);
-                setWorkspaces([...currentKeys, newName]);
-                setCurrentWorkspace(newName);
-                
-                showToast(`Imported "${newName}" successfully!`, 'success');
-            } catch {
-                showToast('Storage quota exceeded or error saving to local storage.', 'error');
-            }
+          let baseName = file.name.replace('.json', '').trim();
+          if (!baseName) {
+            baseName = 'Imported Workspace';
+          }
+          let newName = baseName;
+
+          const data = localStorage.getItem('flowforge_workspaces');
+          const parsedStorage = data ? JSON.parse(data) : {};
+          const currentKeys = Object.keys(parsedStorage);
+
+          while (
+            currentKeys.includes(newName) ||
+            isInvalidWorkspaceName(newName)
+          ) {
+            newName = `${baseName}-${Math.random().toString(36).substring(2, 6)}`;
+          }
+
+          try {
+            parsedStorage[newName] = parsed;
+            localStorage.setItem(
+              'flowforge_workspaces',
+              JSON.stringify(parsedStorage),
+            );
+
+            // Only update React state after successfully persisting to localStorage
+            setBlocks(parsed);
+            setSelectedBlockId(null);
+            setActiveParentId(null);
+            setWorkspaces([...currentKeys, newName]);
+            setCurrentWorkspace(newName);
+
+            showToast(`Imported "${newName}" successfully!`, 'success');
+          } catch {
+            showToast(
+              'Storage quota exceeded or error saving to local storage.',
+              'error',
+            );
+          }
         } else {
-            showToast('Invalid workspace file', 'error');
+          showToast('Invalid workspace file', 'error');
         }
       } catch {
         showToast('Failed to parse JSON', 'error');
@@ -449,16 +482,20 @@ export default function App() {
 
     setTimeout(() => {
       try {
-        const fileContent = JSON.stringify({
-          application: "FlowForge Fluent Flowchart Builder",
-          timestamp: new Date().toISOString(),
-          format: format,
-          blueprint: blocks
-        }, null, 2);
+        const fileContent = JSON.stringify(
+          {
+            application: 'FlowForge Fluent Flowchart Builder',
+            timestamp: new Date().toISOString(),
+            format: format,
+            blueprint: blocks,
+          },
+          null,
+          2,
+        );
 
-        const blob = new Blob([fileContent], { type: "application/json" });
+        const blob = new Blob([fileContent], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
+        const link = document.createElement('a');
         link.href = url;
         link.download = `flowforge-export-${Date.now()}.${format === 'pptx' ? 'json' : format}.txt`;
         document.body.appendChild(link);
@@ -466,7 +503,10 @@ export default function App() {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        showToast(`${format.toUpperCase()} export completed successfully!`, 'success');
+        showToast(
+          `${format.toUpperCase()} export completed successfully!`,
+          'success',
+        );
       } catch {
         showToast(`Failed to export ${format.toUpperCase()}`, 'error');
       }

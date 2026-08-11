@@ -150,7 +150,7 @@ export function useKeyboardShortcuts({
             (b) =>
               b.targetId === currentBlock.id ||
               b.yesTargetId === currentBlock.id ||
-              b.noTargetId === currentBlock.id
+              b.noTargetId === currentBlock.id,
           );
 
           if (parent) {

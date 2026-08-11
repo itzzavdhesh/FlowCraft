@@ -28,7 +28,7 @@ export default function LeftSidebar({
 }: LeftSidebarProps) {
   const [selectedType, setSelectedType] = useState<ShapeType>('terminator');
   const [blockLabel, setBlockLabel] = useState('');
-  
+
   // Decision specific branch labels
   const [yesLabel, setYesLabel] = useState('Yes');
   const [noLabel, setNoLabel] = useState('No');
@@ -62,31 +62,44 @@ export default function LeftSidebar({
     setNoLabel('No');
   };
 
-  const shapeCards: Array<{ type: ShapeType; name: string; desc: string; render: React.ReactNode }> = [
+  const shapeCards: Array<{
+    type: ShapeType;
+    name: string;
+    desc: string;
+    render: React.ReactNode;
+  }> = [
     {
       type: 'terminator',
       name: 'Terminator',
       desc: 'Start / End',
-      render: <div className="w-10 h-5 border-2 border-current rounded-full mx-auto" />
+      render: (
+        <div className="w-10 h-5 border-2 border-current rounded-full mx-auto" />
+      ),
     },
     {
       type: 'process',
       name: 'Process',
       desc: 'Action / Step',
-      render: <div className="w-10 h-5 border-2 border-current rounded mx-auto" />
+      render: (
+        <div className="w-10 h-5 border-2 border-current rounded mx-auto" />
+      ),
     },
     {
       type: 'decision',
       name: 'Decision',
       desc: 'Yes / No Branch',
-      render: <div className="w-5 h-5 border-2 border-current rotate-45 mx-auto my-0.5" />
+      render: (
+        <div className="w-5 h-5 border-2 border-current rotate-45 mx-auto my-0.5" />
+      ),
     },
     {
       type: 'io',
       name: 'Input/Output',
       desc: 'Data / IO',
-      render: <div className="w-10 h-5 border-2 border-current -skew-x-[15deg] mx-auto" />
-    }
+      render: (
+        <div className="w-10 h-5 border-2 border-current -skew-x-[15deg] mx-auto" />
+      ),
+    },
   ];
 
   const getBadgeStyle = (type: ShapeType) => {
@@ -110,8 +123,15 @@ export default function LeftSidebar({
           <Zap className="w-5 h-5 text-white fill-white/10" />
         </div>
         <div>
-          <h1 id="app-logo-text" className="text-lg font-bold text-gray-900 dark:text-slate-100 tracking-tight">FlowCraft</h1>
-          <p className="text-[10px] font-medium text-gray-400 dark:text-slate-500 tracking-wide uppercase">Interactive Builder</p>
+          <h1
+            id="app-logo-text"
+            className="text-lg font-bold text-gray-900 dark:text-slate-100 tracking-tight"
+          >
+            FlowCraft
+          </h1>
+          <p className="text-[10px] font-medium text-gray-400 dark:text-slate-500 tracking-wide uppercase">
+            Interactive Builder
+          </p>
         </div>
       </div>
 
@@ -122,7 +142,10 @@ export default function LeftSidebar({
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
               <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 truncate">
-                Adding after: <strong className="text-indigo-900 dark:text-indigo-100 font-bold">{activeParentBlock.label}</strong>
+                Adding after:{' '}
+                <strong className="text-indigo-900 dark:text-indigo-100 font-bold">
+                  {activeParentBlock.label}
+                </strong>
               </span>
             </div>
             <button
@@ -138,7 +161,12 @@ export default function LeftSidebar({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <h2 id="left-sidebar-add-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Add Block</h2>
+            <h2
+              id="left-sidebar-add-title"
+              className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3"
+            >
+              Add Block
+            </h2>
             <div className="grid grid-cols-2 gap-2">
               {shapeCards.map((card) => {
                 const isSelected = selectedType === card.type;
@@ -153,12 +181,18 @@ export default function LeftSidebar({
                         : 'border-gray-200 dark:border-slate-600 hover:border-gray-350 dark:hover:border-slate-500 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400'
                     }`}
                   >
-                    <div className={`${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-slate-500 group-hover:text-gray-600 dark:group-hover:text-slate-300'} transition-colors`}>
+                    <div
+                      className={`${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-slate-500 group-hover:text-gray-600 dark:group-hover:text-slate-300'} transition-colors`}
+                    >
                       {card.render}
                     </div>
                     <div>
-                      <div className="text-[11px] font-bold tracking-tight">{card.name}</div>
-                      <div className="text-[9px] text-gray-400 dark:text-slate-500">{card.desc}</div>
+                      <div className="text-[11px] font-bold tracking-tight">
+                        {card.name}
+                      </div>
+                      <div className="text-[9px] text-gray-400 dark:text-slate-500">
+                        {card.desc}
+                      </div>
                     </div>
                   </button>
                 );
@@ -168,7 +202,12 @@ export default function LeftSidebar({
 
           <div className="space-y-3">
             <div>
-              <label htmlFor="block-label-input" className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5">Block Label</label>
+              <label
+                htmlFor="block-label-input"
+                className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1.5"
+              >
+                Block Label
+              </label>
               <input
                 id="block-label-input"
                 type="text"
@@ -182,7 +221,12 @@ export default function LeftSidebar({
             {selectedType === 'decision' && (
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <div>
-                  <label htmlFor="yes-label-input" className="block text-[10px] font-bold text-gray-600 dark:text-slate-400 mb-1">Yes Label</label>
+                  <label
+                    htmlFor="yes-label-input"
+                    className="block text-[10px] font-bold text-gray-600 dark:text-slate-400 mb-1"
+                  >
+                    Yes Label
+                  </label>
                   <input
                     id="yes-label-input"
                     type="text"
@@ -193,7 +237,12 @@ export default function LeftSidebar({
                   />
                 </div>
                 <div>
-                  <label htmlFor="no-label-input" className="block text-[10px] font-bold text-gray-600 dark:text-slate-400 mb-1">No Label</label>
+                  <label
+                    htmlFor="no-label-input"
+                    className="block text-[10px] font-bold text-gray-600 dark:text-slate-400 mb-1"
+                  >
+                    No Label
+                  </label>
                   <input
                     id="no-label-input"
                     type="text"
@@ -219,11 +268,18 @@ export default function LeftSidebar({
         </form>
 
         <div className="border-t border-gray-100 dark:border-slate-700 pt-5">
-          <h2 id="left-sidebar-list-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-3 block">Blocks</h2>
-          
+          <h2
+            id="left-sidebar-list-title"
+            className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-3 block"
+          >
+            Blocks
+          </h2>
+
           {blocks.length === 0 ? (
             <div className="text-center py-6 border border-dashed border-gray-200 dark:border-slate-600 rounded-xl bg-gray-50/50 dark:bg-slate-800/50">
-              <p className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">No blocks yet</p>
+              <p className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">
+                No blocks yet
+              </p>
             </div>
           ) : (
             <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">

@@ -25,7 +25,14 @@ export default function Toast({ toasts, onClose }: ToastProps) {
   );
 }
 
-function ToastItem({ toast, onClose }: { toast: ToastConfig; onClose: (id: string) => void; key?: React.Key }) {
+function ToastItem({
+  toast,
+  onClose,
+}: {
+  toast: ToastConfig;
+  onClose: (id: string) => void;
+  key?: React.Key;
+}) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose(toast.id);
@@ -61,7 +68,9 @@ function ToastItem({ toast, onClose }: { toast: ToastConfig; onClose: (id: strin
     >
       {icons[toast.type]}
       <div className="flex-grow">
-        <p className={`text-sm font-medium ${textColors[toast.type]}`}>{toast.message}</p>
+        <p className={`text-sm font-medium ${textColors[toast.type]}`}>
+          {toast.message}
+        </p>
       </div>
       <button
         onClick={() => onClose(toast.id)}

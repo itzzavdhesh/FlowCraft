@@ -4,13 +4,13 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { 
-  Play, 
-  Save, 
-  FolderOpen, 
-  FileImage, 
-  FileText, 
-  Presentation, 
+import {
+  Play,
+  Save,
+  FolderOpen,
+  FileImage,
+  FileText,
+  Presentation,
   Sparkles,
   MousePointer,
   HelpCircle,
@@ -25,13 +25,19 @@ import {
   Upload,
   Keyboard,
   X,
-  ChevronDown
+  ChevronDown,
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import pptxgen from 'pptxgenjs';
 import { Block, CanvasNode, LayoutDirection } from '../types';
-import { calculateLayout, calculateConnections, NODE_WIDTH, NODE_HEIGHT, DIAMOND_SIZE } from '../utils/layout';
+import {
+  calculateLayout,
+  calculateConnections,
+  NODE_WIDTH,
+  NODE_HEIGHT,
+  DIAMOND_SIZE,
+} from '../utils/layout';
 
 interface CenterCanvasProps {
   blocks: Block[];
@@ -96,7 +102,10 @@ export default function CenterCanvas({
 
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(e.target as Node)
+      ) {
         setShowExportMenu(false);
       }
     };
@@ -112,8 +121,8 @@ export default function CenterCanvas({
     const target = e.target as HTMLElement;
     // Do not initiate pan on interactive child elements
     if (
-      target.closest('[id^="flow-node"]') || 
-      target.closest('button') || 
+      target.closest('[id^="flow-node"]') ||
+      target.closest('button') ||
       target.closest('.zoom-controls')
     ) {
       return;
@@ -174,15 +183,14 @@ export default function CenterCanvas({
   let maxLayoutX = minWidth;
   let maxLayoutY = minHeight;
 
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     minLayoutX = Math.min(minLayoutX, node.x);
     minLayoutY = Math.min(minLayoutY, node.y);
     maxLayoutX = Math.max(maxLayoutX, node.x + NODE_WIDTH);
     maxLayoutY = Math.max(maxLayoutY, node.y + NODE_HEIGHT);
   });
 
-
-  connections.forEach(conn => {
+  connections.forEach((conn) => {
     if (conn.bounds) {
       minLayoutX = Math.min(minLayoutX, conn.bounds.minX);
       minLayoutY = Math.min(minLayoutY, conn.bounds.minY);
@@ -268,7 +276,11 @@ export default function CenterCanvas({
       const slideWidth = Math.max(10, maxWidth / 96);
       const slideHeight = Math.max(5.625, maxHeight / 96);
 
-      pres.defineLayout({ name: 'FLOW_LAYOUT', width: slideWidth, height: slideHeight });
+      pres.defineLayout({
+        name: 'FLOW_LAYOUT',
+        width: slideWidth,
+        height: slideHeight,
+      });
       pres.layout = 'FLOW_LAYOUT';
 
       const slide = pres.addSlide();
@@ -276,22 +288,28 @@ export default function CenterCanvas({
 
       // 1. Draw connections/edges first (rendered below nodes)
       connections.forEach((c) => {
-        const sourceNode = nodes.find(n => n.block.id === c.sourceId);
-        const targetNode = nodes.find(n => n.block.id === c.targetId);
+        const sourceNode = nodes.find((n) => n.block.id === c.sourceId);
+        const targetNode = nodes.find((n) => n.block.id === c.targetId);
         if (!sourceNode || !targetNode) return;
 
         // Use exact edge start and end points calculated in layout.ts or default to node centers
-        const x1 = (c.startX !== undefined ? c.startX : (sourceNode.x + NODE_WIDTH / 2)) / 96;
-        const y1 = (c.startY !== undefined ? c.startY : (sourceNode.y + NODE_HEIGHT / 2)) / 96;
-        const x2 = (c.endX !== undefined ? c.endX : (targetNode.x + NODE_WIDTH / 2)) / 96;
-        const y2 = (c.endY !== undefined ? c.endY : (targetNode.y + NODE_HEIGHT / 2)) / 96;
+        const x1 =
+          (c.startX !== undefined ? c.startX : sourceNode.x + NODE_WIDTH / 2) /
+          96;
+        const y1 =
+          (c.startY !== undefined ? c.startY : sourceNode.y + NODE_HEIGHT / 2) /
+          96;
+        const x2 =
+          (c.endX !== undefined ? c.endX : targetNode.x + NODE_WIDTH / 2) / 96;
+        const y2 =
+          (c.endY !== undefined ? c.endY : targetNode.y + NODE_HEIGHT / 2) / 96;
 
         const lx = Math.min(x1, x2);
         const ly = Math.min(y1, y2);
         const lw = Math.abs(x2 - x1);
         const lh = Math.abs(y2 - y1);
 
-        const shapeIsFlipped = (x2 < x1) !== (y2 < y1);
+        const shapeIsFlipped = x2 < x1 !== y2 < y1;
         const beginArrow = shapeIsFlipped ? 'triangle' : 'none';
         const endArrow = shapeIsFlipped ? 'none' : 'triangle';
 
@@ -307,9 +325,9 @@ export default function CenterCanvas({
             width: 2,
             beginArrowType: beginArrow,
             endArrowType: endArrow,
-            line_end: { type: 'arrow', size: 2 }
+            line_end: { type: 'arrow', size: 2 },
           },
-          line_end: { type: 'arrow', size: 2 }
+          line_end: { type: 'arrow', size: 2 },
         };
 
         if (x2 < x1) lineOptions.flipH = true;
@@ -333,7 +351,7 @@ export default function CenterCanvas({
             fill: { color: 'FFFFFF' },
             line: { color: 'E2E8F0', width: 1 },
             bold: true,
-            fontFace: 'Arial'
+            fontFace: 'Arial',
           });
         }
       });
@@ -369,7 +387,7 @@ export default function CenterCanvas({
           bold: true,
           align: 'center',
           valign: 'middle',
-          fontFace: 'Arial'
+          fontFace: 'Arial',
         });
       });
 
@@ -382,10 +400,11 @@ export default function CenterCanvas({
   };
 
   const getShapeStyle = (type: string, isSelected: boolean) => {
-    const baseClass = "absolute transition-all duration-250 cursor-pointer flex items-center justify-center border-2 shadow-md ";
-    const selectedClass = isSelected 
-      ? "border-indigo-600 dark:border-indigo-400 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 shadow-lg scale-102"
-      : "border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 hover:shadow-lg hover:scale-101";
+    const baseClass =
+      'absolute transition-all duration-250 cursor-pointer flex items-center justify-center border-2 shadow-md ';
+    const selectedClass = isSelected
+      ? 'border-indigo-600 dark:border-indigo-400 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 shadow-lg scale-102'
+      : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 hover:shadow-lg hover:scale-101';
 
     switch (type) {
       case 'terminator':
@@ -407,44 +426,75 @@ export default function CenterCanvas({
       {/* Top Toolbar */}
       <header className="h-[64px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 shadow-xs px-4 flex items-center justify-between shrink-0 select-none z-10 overflow-x-auto overflow-y-visible custom-scrollbar flex-nowrap min-w-0 max-w-full">
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Workspace</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+            Workspace
+          </span>
           <span className="text-gray-300 dark:text-slate-600">/</span>
-          <select 
-            value={currentWorkspace} 
+          <select
+            value={currentWorkspace}
             onChange={(e) => onLoad(e.target.value)}
             className="text-sm font-bold text-gray-800 dark:text-slate-100 bg-transparent border-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-sm max-w-[140px] truncate appearance-none"
             style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
           >
-            {workspaces.map(w => <option key={w} value={w} className="dark:bg-slate-800">{w}</option>)}
+            {workspaces.map((w) => (
+              <option key={w} value={w} className="dark:bg-slate-800">
+                {w}
+              </option>
+            ))}
           </select>
-          <span className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/40 text-[10px] text-indigo-600 dark:text-indigo-300 rounded-md font-semibold font-mono hidden sm:inline">STABLE</span>
-          <button onClick={() => {
-            let name = prompt('Save workspace as (enter new name):', currentWorkspace + ' Copy');
-            if (name) {
-              name = name.trim();
-              if (name === '') return;
-              if (workspaces.includes(name) && name !== currentWorkspace) {
-                if (!confirm(`Workspace "${name}" already exists. Overwrite?`)) return;
+          <span className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/40 text-[10px] text-indigo-600 dark:text-indigo-300 rounded-md font-semibold font-mono hidden sm:inline">
+            STABLE
+          </span>
+          <button
+            onClick={() => {
+              let name = prompt(
+                'Save workspace as (enter new name):',
+                currentWorkspace + ' Copy',
+              );
+              if (name) {
+                name = name.trim();
+                if (name === '') return;
+                if (workspaces.includes(name) && name !== currentWorkspace) {
+                  if (
+                    !confirm(`Workspace "${name}" already exists. Overwrite?`)
+                  )
+                    return;
+                }
+                onSave(name);
               }
-              onSave(name);
-            }
-          }} title="Save As" className="text-gray-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer ml-1 p-1">
-             <Save className="w-3.5 h-3.5" />
+            }}
+            title="Save As"
+            className="text-gray-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer ml-1 p-1"
+          >
+            <Save className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => {
-            if(confirm(`Are you sure you want to delete the workspace "${currentWorkspace}"?`)) onDeleteWorkspace(currentWorkspace);
-          }} title="Delete Workspace" className="text-gray-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 cursor-pointer p-1">
-             <Trash2 className="w-3.5 h-3.5" />
+          <button
+            onClick={() => {
+              if (
+                confirm(
+                  `Are you sure you want to delete the workspace "${currentWorkspace}"?`,
+                )
+              )
+                onDeleteWorkspace(currentWorkspace);
+            }}
+            title="Delete Workspace"
+            className="text-gray-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 cursor-pointer p-1"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
           <button
             onClick={toggleDarkMode}
-            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             className="px-2 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {isDarkMode ? (
+              <Sun className="w-4 h-4" />
+            ) : (
+              <Moon className="w-4 h-4" />
+            )}
           </button>
 
           <button
@@ -466,18 +516,27 @@ export default function CenterCanvas({
             <Save className="w-3.5 h-3.5" />
             Save
           </button>
-          
+
           <label className="px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer">
             <Upload className="w-3.5 h-3.5" />
             <span>Import</span>
-            <input type="file" accept=".json" className="hidden" onChange={(e) => {
-               if(e.target.files?.[0]) onImportJSON(e.target.files[0]);
-               e.target.value = '';
-            }} />
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.[0]) onImportJSON(e.target.files[0]);
+                e.target.value = '';
+              }}
+            />
           </label>
 
           <button
-            onClick={() => onLayoutDirectionChange(layoutDirection === 'vertical' ? 'horizontal' : 'vertical')}
+            onClick={() =>
+              onLayoutDirectionChange(
+                layoutDirection === 'vertical' ? 'horizontal' : 'vertical',
+              )
+            }
             title="Toggle layout direction"
             className="px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
@@ -506,27 +565,38 @@ export default function CenterCanvas({
             >
               <Download className="w-3.5 h-3.5" />
               <span>Export</span>
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${showExportMenu ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform duration-150 ${showExportMenu ? 'rotate-180' : ''}`}
+              />
             </button>
 
             {showExportMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <button
-                  onClick={() => { handleExportPNG(); setShowExportMenu(false); }}
+                  onClick={() => {
+                    handleExportPNG();
+                    setShowExportMenu(false);
+                  }}
                   className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
                 >
                   <FileImage className="w-4 h-4 text-indigo-500" />
                   <span>Export PNG Image</span>
                 </button>
                 <button
-                  onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
+                  onClick={() => {
+                    handleExportPDF();
+                    setShowExportMenu(false);
+                  }}
                   className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
                 >
                   <FileText className="w-4 h-4 text-rose-500" />
                   <span>Export PDF Document</span>
                 </button>
                 <button
-                  onClick={() => { handleExportPPTX(); setShowExportMenu(false); }}
+                  onClick={() => {
+                    handleExportPPTX();
+                    setShowExportMenu(false);
+                  }}
                   className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
                 >
                   <Presentation className="w-4 h-4 text-amber-500" />
@@ -537,7 +607,10 @@ export default function CenterCanvas({
                 </button>
                 <div className="my-1 border-t border-gray-100 dark:border-slate-700"></div>
                 <button
-                  onClick={() => { onExportJSON(); setShowExportMenu(false); }}
+                  onClick={() => {
+                    onExportJSON();
+                    setShowExportMenu(false);
+                  }}
                   className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
                 >
                   <Download className="w-4 h-4 text-emerald-500" />
@@ -550,7 +623,7 @@ export default function CenterCanvas({
       </header>
 
       {/* Grid Canvas area with zoom and pan interaction */}
-      <div 
+      <div
         ref={containerRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -560,7 +633,7 @@ export default function CenterCanvas({
           isPanning ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
-          backgroundImage: isDarkMode 
+          backgroundImage: isDarkMode
             ? 'radial-gradient(#334155 1.5px, transparent 1.5px)'
             : 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
           backgroundSize: `${20 * scale}px ${20 * scale}px`,
@@ -573,7 +646,9 @@ export default function CenterCanvas({
             <div className="w-20 h-20 rounded-2xl bg-indigo-50 dark:bg-slate-800 flex items-center justify-center mb-5 animate-bounce shadow-inner">
               <MousePointer className="w-10 h-10 text-indigo-500 dark:text-indigo-400" />
             </div>
-            <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 tracking-tight text-center">Unleash Your Structured Flow</h3>
+            <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 tracking-tight text-center">
+              Unleash Your Structured Flow
+            </h3>
             <p className="text-xs text-gray-400 dark:text-slate-400 mt-1 max-w-[280px] text-center leading-relaxed">
               No blocks yet. Add your first block from the left panel.
             </p>
@@ -589,11 +664,11 @@ export default function CenterCanvas({
         ) : (
           <>
             {/* Play flowchart view */}
-            <div 
+            <div
               ref={canvasRef}
               className={`relative origin-top-left ${isDarkMode ? 'dark' : ''}`}
-              style={{ 
-                width: `${maxWidth}px`, 
+              style={{
+                width: `${maxWidth}px`,
                 height: `${maxHeight}px`,
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
               }}
@@ -625,126 +700,129 @@ export default function CenterCanvas({
                   </marker>
                 </defs>
                 <g transform={`translate(${offsetX}, ${offsetY})`}>
+                  {connections.map((c) => {
+                    const isUnconnected = !!(c as any).isUnconnected;
+                    const endX = (c as any).endX;
+                    const endY = (c as any).endY;
 
-                {connections.map((c) => {
-                  const isUnconnected = !!(c as any).isUnconnected;
-                  const endX = (c as any).endX;
-                  const endY = (c as any).endY;
-
-                  return (
-                    <g key={c.id}>
-                      {isUnconnected ? (
-                        <>
-                          {/* Faint dashed arrow line */}
-                          <path
-                            d={c.path}
-                            fill="none"
-                            stroke="#cbd5e1"
-                            strokeWidth="1.5"
-                            strokeDasharray="4,4"
-                            markerEnd="url(#unconnected-arrow)"
-                            className="transition-all"
-                          />
-                          {/* "?" endpoint circle */}
-                          {endX !== undefined && endY !== undefined && (
-                            <g transform={`translate(${endX}, ${endY})`}>
-                              <circle
-                                r="9"
-                                fill="white"
-                                stroke="#94a3b8"
-                                strokeWidth="1.5"
-                                strokeDasharray="2,2"
-                              />
-                              <text
-                                textAnchor="middle"
-                                alignmentBaseline="central"
-                                className="text-[10px] font-extrabold fill-slate-500 font-mono select-none"
-                                y="0.5"
+                    return (
+                      <g key={c.id}>
+                        {isUnconnected ? (
+                          <>
+                            {/* Faint dashed arrow line */}
+                            <path
+                              d={c.path}
+                              fill="none"
+                              stroke="#cbd5e1"
+                              strokeWidth="1.5"
+                              strokeDasharray="4,4"
+                              markerEnd="url(#unconnected-arrow)"
+                              className="transition-all"
+                            />
+                            {/* "?" endpoint circle */}
+                            {endX !== undefined && endY !== undefined && (
+                              <g transform={`translate(${endX}, ${endY})`}>
+                                <circle
+                                  r="9"
+                                  fill="white"
+                                  stroke="#94a3b8"
+                                  strokeWidth="1.5"
+                                  strokeDasharray="2,2"
+                                />
+                                <text
+                                  textAnchor="middle"
+                                  alignmentBaseline="central"
+                                  className="text-[10px] font-extrabold fill-slate-500 font-mono select-none"
+                                  y="0.5"
+                                >
+                                  ?
+                                </text>
+                              </g>
+                            )}
+                            {/* Connection Label for Unconnected Branch */}
+                            {c.label && (
+                              <g
+                                transform={`translate(${c.labelX}, ${c.labelY})`}
                               >
-                                ?
-                              </text>
-                            </g>
-                          )}
-                          {/* Connection Label for Unconnected Branch */}
-                          {c.label && (
-                            <g transform={`translate(${c.labelX}, ${c.labelY})`}>
-                              <rect
-                                x="-20"
-                                y="-10"
-                                width="38"
-                                height="18"
-                                rx="5"
-                                fill="white"
-                                stroke="#cbd5e1"
-                                strokeWidth="1"
-                                className="shadow-xs"
-                              />
-                              <text
-                                textAnchor="middle"
-                                alignmentBaseline="middle"
-                                className="text-[10px] font-bold fill-slate-500 select-none font-sans"
-                                y="-2"
+                                <rect
+                                  x="-20"
+                                  y="-10"
+                                  width="38"
+                                  height="18"
+                                  rx="5"
+                                  fill="white"
+                                  stroke="#cbd5e1"
+                                  strokeWidth="1"
+                                  className="shadow-xs"
+                                />
+                                <text
+                                  textAnchor="middle"
+                                  alignmentBaseline="middle"
+                                  className="text-[10px] font-bold fill-slate-500 select-none font-sans"
+                                  y="-2"
+                                >
+                                  {c.label}
+                                </text>
+                              </g>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {/* Subtle drop shadow underneath path line */}
+                            <path
+                              d={c.path}
+                              fill="none"
+                              stroke="#e2e8f0"
+                              strokeWidth="4"
+                              className="transition-all"
+                            />
+                            {/* Indigo active line */}
+                            <path
+                              d={c.path}
+                              fill="none"
+                              stroke="#6366f1"
+                              strokeWidth="2"
+                              markerEnd="url(#arrow)"
+                              className="transition-all"
+                            />
+                            {/* Connection Label */}
+                            {c.label && (
+                              <g
+                                transform={`translate(${c.labelX}, ${c.labelY})`}
                               >
-                                {c.label}
-                              </text>
-                            </g>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          {/* Subtle drop shadow underneath path line */}
-                          <path
-                            d={c.path}
-                            fill="none"
-                            stroke="#e2e8f0"
-                            strokeWidth="4"
-                            className="transition-all"
-                          />
-                          {/* Indigo active line */}
-                          <path
-                            d={c.path}
-                            fill="none"
-                            stroke="#6366f1"
-                            strokeWidth="2"
-                            markerEnd="url(#arrow)"
-                            className="transition-all"
-                          />
-                          {/* Connection Label */}
-                          {c.label && (
-                            <g transform={`translate(${c.labelX}, ${c.labelY})`}>
-                              <rect
-                                x="-20"
-                                y="-10"
-                                width="38"
-                                height="18"
-                                rx="5"
-                                fill="white"
-                                stroke="#e2e8f0"
-                                strokeWidth="1"
-                                className="shadow"
-                              />
-                              <text
-                                textAnchor="middle"
-                                alignmentBaseline="middle"
-                                className="text-[10px] font-bold fill-indigo-600 select-none font-sans"
-                                y="-1"
-                              >
-                                {c.label}
-                              </text>
-                            </g>
-                          )}
-                        </>
-                      )}
-                    </g>
-                  );
-                })}
+                                <rect
+                                  x="-20"
+                                  y="-10"
+                                  width="38"
+                                  height="18"
+                                  rx="5"
+                                  fill="white"
+                                  stroke="#e2e8f0"
+                                  strokeWidth="1"
+                                  className="shadow"
+                                />
+                                <text
+                                  textAnchor="middle"
+                                  alignmentBaseline="middle"
+                                  className="text-[10px] font-bold fill-indigo-600 select-none font-sans"
+                                  y="-1"
+                                >
+                                  {c.label}
+                                </text>
+                              </g>
+                            )}
+                          </>
+                        )}
+                      </g>
+                    );
+                  })}
                 </g>
               </svg>
 
               {/* Render absolute divs representing the custom visual nodes */}
               {nodes.map((node) => {
                 const isSelected = selectedBlockId === node.block.id;
-                
+
                 // Custom structures for specialized Shapes
                 if (node.block.type === 'decision') {
                   return (
@@ -761,7 +839,7 @@ export default function CenterCanvas({
                       className="absolute group cursor-pointer origin-center text-indigo-950 dark:text-indigo-100"
                     >
                       {/* Diamond visually rotated 45 degrees, sized as a neat background */}
-                      <div 
+                      <div
                         style={{
                           width: `${DIAMOND_SIZE}px`,
                           height: `${DIAMOND_SIZE}px`,
@@ -769,13 +847,13 @@ export default function CenterCanvas({
                           top: `${(NODE_HEIGHT - DIAMOND_SIZE) / 2}px`,
                         }}
                         className={`absolute border-2 shadow-md transition-all duration-200 bg-white dark:bg-slate-800 rotate-45 ${
-                          isSelected 
-                            ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102' 
+                          isSelected
+                            ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102'
                             : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
                         }`}
                       />
                       {/* Text wrapper kept upright at the same coordinates, centered perfectly */}
-                      <div 
+                      <div
                         style={{
                           width: `${DIAMOND_SIZE - 12}px`,
                           height: `${DIAMOND_SIZE - 12}px`,
@@ -807,21 +885,19 @@ export default function CenterCanvas({
                       className="absolute group cursor-pointer origin-center text-indigo-950 dark:text-indigo-100"
                     >
                       {/* Parallelogram Shape */}
-                      <div 
+                      <div
                         className={`absolute inset-0 transition-all duration-250 bg-white dark:bg-slate-800 border-2 rounded-md shadow-md ${
-                          isSelected 
-                            ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102' 
+                          isSelected
+                            ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102'
                             : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
                         }`}
                         style={{
                           transform: 'skewX(-15deg)',
                         }}
                       />
-                      
+
                       {/* Counter-skewed text container */}
-                      <div 
-                        className="absolute inset-0 flex items-center justify-center px-4 text-center z-10 pointer-events-none"
-                      >
+                      <div className="absolute inset-0 flex items-center justify-center px-4 text-center z-10 pointer-events-none">
                         <span className="text-xs font-bold line-clamp-2 leading-tight select-none">
                           {node.block.label}
                         </span>
@@ -857,7 +933,11 @@ export default function CenterCanvas({
             {/* Float Zoom and Pan Control HUD Panel */}
             <div className="zoom-controls absolute bottom-6 right-6 flex items-center gap-2 bg-white px-3 py-2 rounded-xl shadow-lg border border-gray-150 z-20 select-none">
               <button
-                onClick={() => setScale(prev => Math.max(0.25, parseFloat((prev - 0.1).toFixed(2))))}
+                onClick={() =>
+                  setScale((prev) =>
+                    Math.max(0.25, parseFloat((prev - 0.1).toFixed(2))),
+                  )
+                }
                 disabled={scale <= 0.25}
                 title="Zoom Out"
                 className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 hover:border-gray-350 text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
@@ -868,7 +948,11 @@ export default function CenterCanvas({
                 {Math.round(scale * 100)}%
               </span>
               <button
-                onClick={() => setScale(prev => Math.min(3, parseFloat((prev + 0.1).toFixed(2))))}
+                onClick={() =>
+                  setScale((prev) =>
+                    Math.min(3, parseFloat((prev + 0.1).toFixed(2))),
+                  )
+                }
                 disabled={scale >= 3}
                 title="Zoom In"
                 className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 hover:border-gray-350 text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
@@ -895,7 +979,9 @@ export default function CenterCanvas({
       {showConfirmModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 max-w-sm w-full mx-4 transform transition-all scale-100">
-            <h3 className="text-sm font-bold text-gray-900 mb-2">New Flowchart Confirmation</h3>
+            <h3 className="text-sm font-bold text-gray-900 mb-2">
+              New Flowchart Confirmation
+            </h3>
             <p className="text-xs text-gray-500 leading-relaxed mb-6">
               Start a new flowchart? Current work will be lost.
             </p>
@@ -934,8 +1020,12 @@ export default function CenterCanvas({
                   <Keyboard className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100">Keyboard Shortcuts</h3>
-                  <p className="text-[11px] text-gray-400 dark:text-slate-400">Power-user efficiency cheatsheet</p>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100">
+                    Keyboard Shortcuts
+                  </h3>
+                  <p className="text-[11px] text-gray-400 dark:text-slate-400">
+                    Power-user efficiency cheatsheet
+                  </p>
                 </div>
               </div>
               <button
@@ -953,12 +1043,20 @@ export default function CenterCanvas({
                 { key: 'Ctrl + D / Cmd + D', desc: 'Duplicate selected block' },
                 { key: 'Ctrl + S / Cmd + S', desc: 'Save workspace state' },
                 { key: 'Escape', desc: 'Deselect block & clear focus' },
-                { key: 'Tab / Shift + Tab', desc: 'Cycle selection forward / backward' },
+                {
+                  key: 'Tab / Shift + Tab',
+                  desc: 'Cycle selection forward / backward',
+                },
                 { key: 'Arrow Keys', desc: 'Navigate connected diagram paths' },
                 { key: 'Shift + ?', desc: 'Toggle shortcuts help dialog' },
               ].map((s) => (
-                <div key={s.key} className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-slate-700/60">
-                  <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">{s.desc}</span>
+                <div
+                  key={s.key}
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-slate-700/60"
+                >
+                  <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">
+                    {s.desc}
+                  </span>
                   <kbd className="px-2 py-1 bg-white dark:bg-slate-800 text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-300 border border-gray-200 dark:border-slate-600 rounded-md shadow-xs">
                     {s.key}
                   </kbd>
