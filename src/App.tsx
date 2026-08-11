@@ -89,6 +89,7 @@ export default function App() {
   const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('vertical');
   const [currentWorkspace, setCurrentWorkspace] = useState<string>('Form-Flow Sandbox');
   const [workspaces, setWorkspaces] = useState<string[]>(['Form-Flow Sandbox']);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
   useEffect(() => {
     try {
@@ -324,6 +325,37 @@ export default function App() {
     showToast(`Block "${block.label}" removed`, 'info');
   };
 
+  // Duplicate block (Ctrl+D / Cmd+D)
+  const handleDuplicateBlock = (id: string) => {
+    const original = blocks.find((b) => b.id === id);
+    if (!original) return;
+
+    const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
+    const duplicatedBlock: Block = {
+      ...original,
+      id: newId,
+      label: `${original.label} (Copy)`,
+    };
+
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === id);
+      if (idx === -1) return [...prev, duplicatedBlock];
+
+      const updated = [...prev];
+      if (original.type !== 'decision') {
+        duplicatedBlock.targetId = original.targetId;
+        updated[idx] = { ...original, targetId: newId };
+      }
+
+      updated.splice(idx + 1, 0, duplicatedBlock);
+      return updated;
+    });
+
+    setSelectedBlockId(newId);
+    setActiveParentId(newId);
+    showToast(`Duplicated "${original.label}"`, 'success');
+  };
+
   // Select and chain next process block
   const handleSelectAndContinue = (parentBlock: Block) => {
     setActiveParentId(parentBlock.id);
@@ -356,6 +388,17 @@ export default function App() {
       showToast('Could not save workspace', 'error');
     }
   };
+
+  useKeyboardShortcuts({
+    blocks,
+    selectedBlockId,
+    currentWorkspace,
+    onSelectBlock: setSelectedBlockId,
+    onDeleteBlock: handleDeleteBlock,
+    onDuplicateBlock: handleDuplicateBlock,
+    onSaveWorkspace: handleSaveWorkspace,
+    onToggleShortcutsHelp: () => setShowShortcutsHelp((prev) => !prev),
+  });
 
   const handleLoadWorkspace = (name: string) => {
     try {
@@ -549,6 +592,8 @@ export default function App() {
         toggleDarkMode={toggleDarkMode}
         layoutDirection={layoutDirection}
         onLayoutDirectionChange={setLayoutDirection}
+        showShortcutsHelp={showShortcutsHelp}
+        onToggleShortcutsHelp={() => setShowShortcutsHelp((prev) => !prev)}
       />
 
       {/* RIGHT SIDEBAR PROPERTIES */}
