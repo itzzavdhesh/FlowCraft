@@ -82,6 +82,7 @@ const isValidWorkspaceBlocks = (blocks: any): blocks is Block[] => {
 };
 
 export default function App() {
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [blocks, setBlocks] = useState<Block[]>(initialDemoBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>('demo-1');
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
@@ -124,40 +125,6 @@ export default function App() {
     } catch {}
   }, []);
 
-  // Dark mode state
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    let initialDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    try {
-      const saved = localStorage.getItem('flowforge_dark_mode');
-      if (saved) initialDark = saved === 'true';
-    } catch {
-      // Ignore storage errors
-    }
-    
-    // Apply class pre-paint
-    if (initialDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    return initialDark;
-  });
-
-  useEffect(() => {
-    // Preserve ongoing theme synchronization after mount
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    try {
-      localStorage.setItem('flowforge_dark_mode', String(isDarkMode));
-    } catch {
-      // Ignore storage errors
-    }
-  }, [isDarkMode]);
-
-  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -255,24 +222,25 @@ export default function App() {
 
   // Duplicate block (Ctrl+D / Cmd+D)
   const handleDuplicateBlock = (id: string) => {
-    const original = blocks.find((b) => b.id === id);
-    if (!original) return;
-
     const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
-    const duplicatedBlock: Block = {
-      ...original,
-      id: newId,
-      label: `${original.label} (Copy)`,
-    };
 
     setBlocks((prev) => {
       const idx = prev.findIndex((b) => b.id === id);
+      const source = idx !== -1 ? prev[idx] : prev.find(b => b.id === id);
+      if (!source) return prev;
+
+      const duplicatedBlock: Block = {
+        ...source,
+        id: newId,
+        label: `${source.label} (Copy)`,
+      };
+
       if (idx === -1) return [...prev, duplicatedBlock];
 
       const updated = [...prev];
-      if (original.type !== 'decision') {
-        duplicatedBlock.targetId = original.targetId;
-        updated[idx] = { ...original, targetId: newId };
+      if (source.type !== 'decision') {
+        duplicatedBlock.targetId = source.targetId;
+        updated[idx] = { ...source, targetId: newId };
       }
 
       updated.splice(idx + 1, 0, duplicatedBlock);

@@ -129,6 +129,7 @@ export default function LeftSidebar({
               type="button"
               onClick={onCancelActiveParent}
               title="Cancel chain connection"
+              aria-label="Cancel chain connection"
               className="p-1 hover:bg-indigo-100 rounded-md text-indigo-500 hover:text-indigo-700 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
@@ -138,7 +139,7 @@ export default function LeftSidebar({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <h2 id="left-sidebar-add-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Add Block</h2>
+            <h2 id="left-sidebar-add-title" className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">Add Block</h2>
             <div className="grid grid-cols-2 gap-2">
               {shapeCards.map((card) => {
                 const isSelected = selectedType === card.type;
@@ -248,24 +249,26 @@ export default function LeftSidebar({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                       <button
                         title="Edit Block"
+                        aria-label="Edit Block"
                         onClick={(e) => {
                           e.stopPropagation();
                           onSelectBlock(block.id);
                         }}
-                        className="p-1 text-gray-400 hover:text-indigo-600 rounded hover:bg-gray-100 transition-colors cursor-pointer"
+                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 dark:bg-gray-800 transition-colors cursor-pointer"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         title="Delete Block"
+                        aria-label="Delete Block"
                         onClick={(e) => {
                           e.stopPropagation();
                           onDeleteBlock(block.id);
                         }}
-                        className="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 rounded hover:bg-red-50 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
