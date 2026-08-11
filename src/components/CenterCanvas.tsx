@@ -309,7 +309,11 @@ export default function CenterCanvas({
         const lw = Math.abs(x2 - x1);
         const lh = Math.abs(y2 - y1);
 
-        const shapeIsFlipped = x2 < x1 !== y2 < y1;
+        // Determine if the arrow shape needs to be flipped based on direction.
+        // Named booleans make the intent explicit and prevent operator-precedence confusion.
+        const arrowGoesLeft = x2 < x1;
+        const arrowGoesUp = y2 < y1;
+        const shapeIsFlipped = arrowGoesLeft !== arrowGoesUp;
         const beginArrow = shapeIsFlipped ? 'triangle' : 'none';
         const endArrow = shapeIsFlipped ? 'none' : 'triangle';
 
@@ -330,8 +334,8 @@ export default function CenterCanvas({
           line_end: { type: 'arrow', size: 2 },
         };
 
-        if (x2 < x1) lineOptions.flipH = true;
-        if (y2 < y1) lineOptions.flipV = true;
+        if (arrowGoesLeft) lineOptions.flipH = true;
+        if (arrowGoesUp) lineOptions.flipV = true;
 
         slide.addShape(pres.ShapeType.line, lineOptions);
 
