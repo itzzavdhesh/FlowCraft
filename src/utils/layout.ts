@@ -422,6 +422,70 @@ function generateConnection(
   layoutBounds: { minX: number; maxX: number } = { minX: 0, maxX: 0 },
   backwardLanes: { left: number; right: number } = { left: 0, right: 0 }
 ): SvgLine {
+  const isLoopback = target.y < source.y;
+
+  if (isLoopback) {
+    const isSourceDecision = source.block.type === 'decision';
+    const isTargetDecision = target.block.type === 'decision';
+
+    const sourceCx = source.x + NODE_WIDTH / 2;
+    const sourceCy = source.y + NODE_HEIGHT / 2;
+    const targetCx = target.x + NODE_WIDTH / 2;
+    const targetCy = target.y + NODE_HEIGHT / 2;
+
+    const routeRight = isSourceDecision
+      ? (connectionType === 'yes')
+      : (source.col >= 0);
+
+    let startX = 0;
+    let startY = 0;
+    if (isSourceDecision) {
+      if (connectionType === 'yes') {
+        startX = sourceCx + DIAMOND_HALF_DIAG;
+        startY = sourceCy;
+      } else {
+        startX = sourceCx - DIAMOND_HALF_DIAG;
+        startY = sourceCy;
+      }
+    } else {
+      startX = routeRight ? source.x + NODE_WIDTH : source.x;
+      startY = sourceCy;
+    }
+
+    let endX = 0;
+    let endY = 0;
+    if (isTargetDecision) {
+      endX = routeRight ? targetCx + DIAMOND_HALF_DIAG : targetCx - DIAMOND_HALF_DIAG;
+      endY = targetCy;
+    } else {
+      endX = routeRight ? target.x + NODE_WIDTH : target.x;
+      endY = targetCy;
+    }
+
+    const bypassX = routeRight
+      ? Math.max(source.x + NODE_WIDTH, target.x + NODE_WIDTH) + 50
+      : Math.min(source.x, target.x) - 50;
+
+    const path = `M ${startX} ${startY} L ${bypassX} ${startY} L ${bypassX} ${endY} L ${endX} ${endY}`;
+    
+    const labelX = startX + (routeRight ? 25 : -25);
+    const labelY = startY - 10;
+
+    return {
+      id: `${source.block.id}-${target.block.id}-${connectionType}`,
+      sourceId: source.block.id,
+      targetId: target.block.id,
+      path,
+      label,
+      labelX,
+      labelY,
+      startX,
+      startY,
+      endX,
+      endY,
+    };
+  }
+
   const isSourceDecision = source.block.type === 'decision';
   const isTargetDecision = target.block.type === 'decision';
 
