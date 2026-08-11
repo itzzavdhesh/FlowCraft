@@ -162,7 +162,7 @@ export default function App() {
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     const newToast: ToastConfig = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: crypto.randomUUID(),
       message,
       type,
     };
@@ -175,7 +175,7 @@ export default function App() {
 
   // Add block from form (Left panel)
   const handleAddBlock = (blockData: Omit<Block, 'id'>) => {
-    const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
+    const newId = `block-${crypto.randomUUID()}`;
 
     setBlocks((prev) => {
       let updated = [...prev];
@@ -258,7 +258,7 @@ export default function App() {
     const original = blocks.find((b) => b.id === id);
     if (!original) return;
 
-    const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
+    const newId = `block-${crypto.randomUUID()}`;
     const duplicatedBlock: Block = {
       ...original,
       id: newId,
@@ -415,7 +415,7 @@ export default function App() {
             const currentKeys = Object.keys(parsedStorage);
             
             while (currentKeys.includes(newName) || isInvalidWorkspaceName(newName)) {
-                newName = `${baseName}-${Math.random().toString(36).substring(2, 6)}`;
+                newName = `${baseName}-${crypto.randomUUID().slice(0, 4)}`;
             }
             
             try {
