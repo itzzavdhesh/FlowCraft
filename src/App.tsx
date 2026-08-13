@@ -266,6 +266,55 @@ export default function App() {
     };
   }, []);
 
+  const [isCollaborative, setIsCollaborative] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const isIncomingUpdate = useRef(false);
+
+  // Connect to collaborative WebSockets
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const socket = new WebSocket(wsUrl);
+    wsRef.current = socket;
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'init' || data.type === 'update') {
+          isIncomingUpdate.current = true;
+          setBlocks(data.blocks);
+        }
+      } catch (e) {
+        console.error("Failed to parse websocket message", e);
+      }
+    };
+
+    socket.onopen = () => {
+      setIsCollaborative(true);
+      showToast("Connected to collaborative canvas!", "success");
+    };
+
+    socket.onclose = () => {
+      setIsCollaborative(false);
+      showToast("Disconnected from collaborative canvas. Offline mode.", "info");
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, []);
+
+  // Broadcast local changes to collaborative peers
+  useEffect(() => {
+    if (isIncomingUpdate.current) {
+      isIncomingUpdate.current = false;
+      return;
+    }
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'update', blocks }));
+    }
+  }, [blocks]);
+
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     const newToast: ToastConfig = {
