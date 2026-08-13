@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "concurrently \"vite --port=3000 --host=0.0.0.0\" \"node server.js\"",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
@@ -16,6 +16,8 @@
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^10.0.3",
+    "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "html-to-image": "^1.11.13",
@@ -25,6 +27,9 @@
     "pptxgenjs": "^4.0.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "uuid": "^14.0.1",
     "vite": "^6.2.3"
   },
   "devDependencies": {

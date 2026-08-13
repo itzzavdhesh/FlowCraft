@@ -59,7 +59,7 @@ const isValidWorkspaceBlocks = (blocks: any): blocks is Block[] => {
   
   const idSet = new Set<string>();
   
-  return blocks.every(b => {
+  const shapeValid = blocks.every(b => {
     if (!b || typeof b !== 'object') return false;
     
     // Core fields
@@ -78,6 +78,15 @@ const isValidWorkspaceBlocks = (blocks: any): blocks is Block[] => {
     if (b.yesTargetId !== undefined && typeof b.yesTargetId !== 'string') return false;
     if (b.noTargetId !== undefined && typeof b.noTargetId !== 'string') return false;
     
+    return true;
+  });
+
+  if (!shapeValid) return false;
+
+  return blocks.every(b => {
+    if (b.targetId && !idSet.has(b.targetId)) return false;
+    if (b.yesTargetId && !idSet.has(b.yesTargetId)) return false;
+    if (b.noTargetId && !idSet.has(b.noTargetId)) return false;
     return true;
   });
 };
@@ -184,6 +193,79 @@ export default function App() {
 
 
 
+  const emitUpdateDebounced = useRef(
+    debounce((block: Block) => socket.emit('update-block', block), 300)
+  ).current;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    let wsId = params.get('workspace');
+    if (!wsId) {
+      wsId = Math.random().toString(36).substring(2, 9);
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('workspace', wsId);
+      window.history.replaceState({}, '', newUrl);
+    }
+    
+    socket.connect();
+    socket.emit('join-workspace', wsId, (initialState: { blocks: Block[] }) => {
+      if (initialState && initialState.blocks && initialState.blocks.length > 0) {
+        if (isValidWorkspaceBlocks(initialState.blocks)) {
+          setBlocks(initialState.blocks);
+          setSelectedBlockId(prev => initialState.blocks.some(b => b.id === prev) ? prev : null);
+          setActiveParentId(prev => initialState.blocks.some(b => b.id === prev) ? prev : null);
+        } else {
+          socket.emit('full-sync', initialDemoBlocks);
+        }
+      } else {
+        socket.emit('full-sync', initialDemoBlocks);
+      }
+    });
+
+    const onBlockAdded = (block: Block) => setBlocks(prev => [...prev, block]);
+    const onBlockUpdated = (updatedBlock: Block) => setBlocks(prev => prev.map(b => b.id === updatedBlock.id ? updatedBlock : b));
+    const onBlockDeleted = (id: string) => {
+      setBlocks(prev => {
+        let updated = prev.filter((b) => b.id !== id);
+        return updated.map((b) => {
+          const next = { ...b };
+          if (next.targetId === id) next.targetId = '';
+          if (next.yesTargetId === id) next.yesTargetId = '';
+          if (next.noTargetId === id) next.noTargetId = '';
+          return next;
+        });
+      });
+      setSelectedBlockId(prev => prev === id ? null : prev);
+      setActiveParentId(prev => prev === id ? null : prev);
+    };
+    const onBlocksCleared = () => {
+      setBlocks([]);
+      setSelectedBlockId(null);
+      setActiveParentId(null);
+    };
+    const onFullSync = (newBlocks: Block[]) => {
+      setBlocks(newBlocks);
+      setSelectedBlockId(prev => newBlocks.some(b => b.id === prev) ? prev : null);
+      setActiveParentId(prev => newBlocks.some(b => b.id === prev) ? prev : null);
+    };
+
+    socket.on('block-added', onBlockAdded);
+    socket.on('block-updated', onBlockUpdated);
+    socket.on('block-deleted', onBlockDeleted);
+    socket.on('blocks-cleared', onBlocksCleared);
+    socket.on('full-sync-update', onFullSync);
+
+    return () => {
+      socket.off('block-added', onBlockAdded);
+      socket.off('block-updated', onBlockUpdated);
+      socket.off('block-deleted', onBlockDeleted);
+      socket.off('blocks-cleared', onBlocksCleared);
+      socket.off('full-sync-update', onFullSync);
+      socket.disconnect();
+      emitUpdateDebounced.cancel();
+    };
+  }, []);
+
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     const newToast: ToastConfig = {
@@ -211,29 +293,38 @@ export default function App() {
           const activeBlock = updated[activeIdx];
           if (activeBlock.type === 'decision') {
             if (!activeBlock.yesTargetId) {
-              updated[activeIdx] = { ...activeBlock, yesTargetId: newId };
+              modifiedActiveBlock = { ...activeBlock, yesTargetId: newId };
             } else if (!activeBlock.noTargetId) {
-              updated[activeIdx] = { ...activeBlock, noTargetId: newId };
+              modifiedActiveBlock = { ...activeBlock, noTargetId: newId };
             }
           } else {
             if (!activeBlock.targetId) {
-              updated[activeIdx] = { ...activeBlock, targetId: newId };
+              modifiedActiveBlock = { ...activeBlock, targetId: newId };
             } else {
-              // Insert in between!
               insertedTargetId = activeBlock.targetId;
-              updated[activeIdx] = { ...activeBlock, targetId: newId };
+              modifiedActiveBlock = { ...activeBlock, targetId: newId };
             }
           }
         }
       }
 
-      const newBlock: Block = {
-        ...blockData,
-        id: newId,
-        targetId: insertedTargetId,
-      };
+      const newBlock: Block = { ...blockData, id: newId, targetId: insertedTargetId };
+
+      if (modifiedActiveBlock) {
+        const activeIdx = updated.findIndex((b) => b.id === activeParentId);
+        if (activeIdx !== -1) updated[activeIdx] = modifiedActiveBlock;
+      }
+
+      return { nextBlocks: [...updated, newBlock], newBlock, modifiedActiveBlock };
+    };
+
+    let emitNewBlock: Block | undefined;
+    let emitModifiedBlock: Block | undefined;
 
       pushState([...updated, newBlock]);
+
+    if (emitNewBlock) socket.emit('add-block', emitNewBlock);
+    if (emitModifiedBlock) socket.emit('update-block', emitModifiedBlock);
 
     // Automatically set the new block as the active parent for sequential additions
     setActiveParentId(newId);
@@ -250,6 +341,7 @@ export default function App() {
 
   // Delete block
   const handleDeleteBlock = (id: string) => {
+    emitUpdateDebounced.flush();
     const block = blocks.find((b) => b.id === id);
     if (!block) return;
 
@@ -286,7 +378,14 @@ export default function App() {
       ...original,
       id: newId,
       label: `${original.label} (Copy)`,
+      // Inherit forward-pointer only for non-decision blocks
+      targetId: original.type !== 'decision' ? original.targetId : undefined,
+      // Clear branch pointers — the duplicate is not wired yet
+      yesTargetId: undefined,
+      noTargetId: undefined,
     };
+    const modifiedOriginal: Block | undefined =
+      original.type !== 'decision' ? { ...original, targetId: newId } : undefined;
 
     const idx = blocks.findIndex((b) => b.id === id);
     if (idx === -1) {
@@ -512,6 +611,7 @@ export default function App() {
     pushState([]);
     setSelectedBlockId(null);
     setActiveParentId(null);
+    socket.emit('clear-blocks');
     showToast('Flowchart cleared. Canvas is ready!', 'info');
   };
 
