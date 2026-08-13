@@ -96,6 +96,18 @@ export default function RightSidebar({
     onUpdateBlock({ ...selectedBlock, noTargetId: val || undefined });
   };
 
+  const handleGroupIdChange = (val: string) => {
+    onUpdateBlock({ ...selectedBlock, groupId: val || undefined });
+  };
+
+  const handleGroupLabelChange = (val: string) => {
+    onUpdateBlock({ ...selectedBlock, groupLabel: val || undefined });
+  };
+
+  const handleGroupCollapseChange = (val: boolean) => {
+    onUpdateBlock({ ...selectedBlock, isGroupCollapsed: val });
+  };
+
   return (
     <aside className="w-[260px] h-full bg-white dark:bg-slate-800 border-l border-gray-100 dark:border-slate-700 shadow-sm flex flex-col justify-between shrink-0 select-none overflow-hidden z-20 relative">
       <div className="p-5 border-b border-gray-105 dark:border-slate-700">
@@ -135,6 +147,47 @@ export default function RightSidebar({
             onKeyDown={handleLabelKeyDown}
             className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 font-sans font-medium focus:ring-1 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-gray-50/50 dark:bg-slate-900/50 hover:bg-gray-50/20 dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-800 text-gray-900 dark:text-slate-100"
           />
+        </div>
+
+        {/* Grouping Fields */}
+        <div className="border-t border-gray-100 pt-3 space-y-3">
+          <h3 className="text-xs font-bold text-gray-700 font-sans">Container Grouping</h3>
+          <div>
+            <label className="block text-[10px] font-bold text-gray-650 mb-1">Group ID (alphanumeric)</label>
+            <input
+              type="text"
+              value={selectedBlock.groupId || ''}
+              onChange={(e) => handleGroupIdChange(e.target.value)}
+              placeholder="e.g. auth-phase, payments"
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 bg-gray-50/50 focus:bg-white"
+            />
+          </div>
+          {selectedBlock.groupId && (
+            <>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-650 mb-1">Group Label</label>
+                <input
+                  type="text"
+                  value={selectedBlock.groupLabel || ''}
+                  onChange={(e) => handleGroupLabelChange(e.target.value)}
+                  placeholder="e.g. Authentication Stage"
+                  className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 bg-gray-50/50 focus:bg-white"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="group-collapse-checkbox"
+                  checked={!!selectedBlock.isGroupCollapsed}
+                  onChange={(e) => handleGroupCollapseChange(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-gray-300 cursor-pointer"
+                />
+                <label htmlFor="group-collapse-checkbox" className="text-[10px] font-bold text-gray-700 cursor-pointer">
+                  Collapse Group
+                </label>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Dynamic Branch Connection Settings */}

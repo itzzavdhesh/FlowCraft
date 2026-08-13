@@ -15,6 +15,9 @@ export interface Block {
   noLabel?: string;  // For decision nodes
   yesTargetId?: string; // Target for "Yes" branch
   noTargetId?: string;  // Target for "No" branch
+  groupId?: string;      // Optional parent group ID
+  groupLabel?: string;   // Optional parent group label
+  isGroupCollapsed?: boolean; // Optional group collapse state
 }
 
 export interface CanvasNode {
