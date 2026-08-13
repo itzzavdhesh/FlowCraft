@@ -4,6 +4,7 @@
  */
 
 import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Play, 
   Save, 
@@ -91,18 +92,94 @@ export default function CenterCanvas({
   const [isPanning, setIsPanning] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportMenuPos, setExportMenuPos] = useState({ top: 0, right: 0 });
+  const exportBtnRef = useRef<HTMLButtonElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const panStart = useRef({ x: 0, y: 0 });
 
+  const toggleExportMenu = () => {
+    if (!showExportMenu && exportBtnRef.current) {
+      const rect = exportBtnRef.current.getBoundingClientRect();
+      setExportMenuPos({
+        top: rect.bottom + 6,
+        right: Math.max(16, window.innerWidth - rect.right),
+      });
+    }
+    setShowExportMenu((prev) => !prev);
+  };
+
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(target) &&
+        exportBtnRef.current &&
+        !exportBtnRef.current.contains(target)
+      ) {
         setShowExportMenu(false);
       }
     };
+
+    const updateMenuPos = () => {
+      if (showExportMenu && exportBtnRef.current) {
+        const rect = exportBtnRef.current.getBoundingClientRect();
+        setExportMenuPos({
+          top: rect.bottom + 6,
+          right: Math.max(16, window.innerWidth - rect.right),
+        });
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    window.addEventListener('resize', updateMenuPos);
+    window.addEventListener('scroll', updateMenuPos, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', updateMenuPos);
+      window.removeEventListener('scroll', updateMenuPos, true);
+    };
+  }, [showExportMenu]);
+
+  // Focus management & focus trap for Keyboard Shortcuts modal
+  const previousActiveElement = useRef<HTMLElement | null>(null);
+  const modalCloseBtnRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (showShortcutsHelp) {
+      previousActiveElement.current = document.activeElement as HTMLElement | null;
+      const timer = setTimeout(() => {
+        modalCloseBtnRef.current?.focus();
+      }, 50);
+
+      const handleModalKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Tab' && modalRef.current) {
+          const focusables = modalRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+          if (focusables.length === 0) return;
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      };
+
+      document.addEventListener('keydown', handleModalKeyDown);
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener('keydown', handleModalKeyDown);
+        previousActiveElement.current?.focus();
+      };
+    }
+  }, [showShortcutsHelp]);
 
   // Mouse pan event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -405,8 +482,8 @@ export default function CenterCanvas({
   return (
     <div className="flex-grow h-full flex flex-col min-w-0 bg-[#fbfbfc] dark:bg-slate-900">
       {/* Top Toolbar */}
-      <header className="h-[64px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 shadow-xs px-4 flex items-center justify-between shrink-0 select-none z-10 overflow-x-auto overflow-y-visible custom-scrollbar flex-nowrap min-w-0 max-w-full">
-        <div className="flex items-center gap-2 shrink-0">
+      <header className="h-[64px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 shadow-xs px-4 flex items-center justify-between shrink-0 select-none z-10 relative min-w-0 max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar flex-nowrap">
+        <div className="flex items-center gap-2 shrink-0 max-w-[45%] overflow-x-auto custom-scrollbar">
           <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Workspace</span>
           <span className="text-gray-300 dark:text-slate-600">/</span>
           <select 
@@ -497,10 +574,14 @@ export default function CenterCanvas({
           <div className="h-4 w-px bg-gray-200 dark:bg-slate-600 mx-0.5"></div>
 
           {/* Unified Sleek Export Dropdown */}
-          <div className="relative" ref={exportMenuRef}>
+          <div className="relative">
             <button
+              ref={exportBtnRef}
               id="toolbar-btn-export-menu"
-              onClick={() => setShowExportMenu((prev) => !prev)}
+              onClick={toggleExportMenu}
+              aria-expanded={showExportMenu}
+              aria-haspopup="true"
+              aria-controls="export-menu-dropdown"
               title="Export diagram in various formats"
               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-150 cursor-pointer"
             >
@@ -508,46 +589,62 @@ export default function CenterCanvas({
               <span>Export</span>
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${showExportMenu ? 'rotate-180' : ''}`} />
             </button>
-
-            {showExportMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                <button
-                  onClick={() => { handleExportPNG(); setShowExportMenu(false); }}
-                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <FileImage className="w-4 h-4 text-indigo-500" />
-                  <span>Export PNG Image</span>
-                </button>
-                <button
-                  onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
-                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <FileText className="w-4 h-4 text-rose-500" />
-                  <span>Export PDF Document</span>
-                </button>
-                <button
-                  onClick={() => { handleExportPPTX(); setShowExportMenu(false); }}
-                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Presentation className="w-4 h-4 text-amber-500" />
-                  <span className="flex items-center gap-1">
-                    Export PPTX
-                    <Sparkles className="w-3 h-3 text-amber-500 fill-amber-200 animate-pulse" />
-                  </span>
-                </button>
-                <div className="my-1 border-t border-gray-100 dark:border-slate-700"></div>
-                <button
-                  onClick={() => { onExportJSON(); setShowExportMenu(false); }}
-                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Download className="w-4 h-4 text-emerald-500" />
-                  <span>Export JSON Blueprint</span>
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </header>
+
+      {/* Portalled Export Dropdown Menu */}
+      {showExportMenu && createPortal(
+        <div
+          ref={exportMenuRef}
+          id="export-menu-dropdown"
+          role="menu"
+          style={{
+            position: 'fixed',
+            top: `${exportMenuPos.top}px`,
+            right: `${exportMenuPos.right}px`,
+          }}
+          className="w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+        >
+          <button
+            role="menuitem"
+            onClick={() => { handleExportPNG(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <FileImage className="w-4 h-4 text-indigo-500" />
+            <span>Export PNG Image</span>
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <FileText className="w-4 h-4 text-rose-500" />
+            <span>Export PDF Document</span>
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => { handleExportPPTX(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Presentation className="w-4 h-4 text-amber-500" />
+            <span className="flex items-center gap-1">
+              Export PPTX
+              <Sparkles className="w-3 h-3 text-amber-500 fill-amber-200 animate-pulse" />
+            </span>
+          </button>
+          <div className="my-1 border-t border-gray-100 dark:border-slate-700"></div>
+          <button
+            role="menuitem"
+            onClick={() => { onExportJSON(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-emerald-500" />
+            <span>Export JSON Blueprint</span>
+          </button>
+        </div>,
+        document.body
+      )}
 
       {/* Grid Canvas area with zoom and pan interaction */}
       <div 
@@ -926,7 +1023,13 @@ export default function CenterCanvas({
 
       {/* Keyboard Shortcuts Help Modal */}
       {showShortcutsHelp && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div
+          ref={modalRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shortcuts-modal-title"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
+        >
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 max-w-md w-full p-6 transform transition-all scale-100">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-slate-700">
               <div className="flex items-center gap-2.5">
@@ -934,12 +1037,16 @@ export default function CenterCanvas({
                   <Keyboard className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100">Keyboard Shortcuts</h3>
+                  <h3 id="shortcuts-modal-title" className="text-sm font-bold text-gray-900 dark:text-slate-100">
+                    Keyboard Shortcuts
+                  </h3>
                   <p className="text-[11px] text-gray-400 dark:text-slate-400">Power-user efficiency cheatsheet</p>
                 </div>
               </div>
               <button
+                ref={modalCloseBtnRef}
                 onClick={onToggleShortcutsHelp}
+                aria-label="Close keyboard shortcuts"
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />

@@ -309,8 +309,8 @@ export default function App() {
 
   // Duplicate block (Ctrl+D / Cmd+D)
   const handleDuplicateBlock = (id: string) => {
-    const original = blocks.find((b) => b.id === id);
-    if (!original) return;
+    const targetBlock = blocks.find((b) => b.id === id);
+    if (!targetBlock) return;
 
     const newId = `block-${crypto.randomUUID()}`;
     const duplicatedBlock: Block = {
@@ -335,8 +335,12 @@ export default function App() {
     pushState(updated);
 
     setSelectedBlockId(newId);
-    setActiveParentId(newId);
-    showToast(`Duplicated "${original.label}"`, 'success');
+    if (canAcceptChild) {
+      setActiveParentId(newId);
+    } else {
+      setActiveParentId(null);
+    }
+    showToast(`Duplicated "${targetBlock.label}"`, 'success');
   };
 
   // Select and chain next process block
@@ -376,6 +380,7 @@ export default function App() {
     blocks,
     selectedBlockId,
     currentWorkspace,
+    showShortcutsHelp,
     onSelectBlock: setSelectedBlockId,
     onDeleteBlock: handleDeleteBlock,
     onDuplicateBlock: handleDuplicateBlock,
