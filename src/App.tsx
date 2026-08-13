@@ -3,14 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { flushSync } from 'react-dom';
+import React, { useState, useEffect, useRef } from 'react';
 import LeftSidebar from './components/LeftSidebar';
 import CenterCanvas from './components/CenterCanvas';
 import RightSidebar from './components/RightSidebar';
 import Toast from './components/Toast';
 import { Block, ToastConfig, LayoutDirection } from './types';
-import { socket, debounce } from './utils/socket';
+import { useDarkMode } from './utils/useDarkMode';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 // Default blueprint layout tracking
@@ -93,6 +92,7 @@ const isValidWorkspaceBlocks = (blocks: any): blocks is Block[] => {
 };
 
 export default function App() {
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [blocks, setBlocks] = useState<Block[]>(initialDemoBlocks);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>('demo-1');
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
@@ -101,6 +101,60 @@ export default function App() {
   const [currentWorkspace, setCurrentWorkspace] = useState<string>('Form-Flow Sandbox');
   const [workspaces, setWorkspaces] = useState<string[]>(['Form-Flow Sandbox']);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  // Guard: prevent auto-save from running before initial hydration from localStorage
+  const hasHydrated = useRef(false);
+
+  // Auto-save
+  useEffect(() => {
+    if (!hasHydrated.current) return; // skip the initial mount — hydration hasn't run yet
+    if (currentWorkspace && workspaces.includes(currentWorkspace)) {
+      try {
+        const data = localStorage.getItem('flowforge_workspaces');
+        const parsed = data ? JSON.parse(data) : {};
+        parsed[currentWorkspace] = blocks;
+        localStorage.setItem('flowforge_workspaces', JSON.stringify(parsed));
+      } catch {
+        showToast('Auto-save failed: localStorage may be full or blocked. Your changes are not persisted.', 'error');
+      }
+    }
+  }, [blocks, currentWorkspace, workspaces]);
+
+  // Undo/Redo state
+  const [past, setPast] = useState<Block[][]>([]);
+  const [future, setFuture] = useState<Block[][]>([]);
+
+  const pushState = (newBlocks: Block[]) => {
+    setPast((p) => [...p, blocks]);
+    setFuture([]);
+    setBlocks(newBlocks);
+  };
+
+  const undo = () => {
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    const newPast = past.slice(0, past.length - 1);
+    setPast(newPast);
+    setFuture([blocks, ...future]);
+    setBlocks(previous);
+    // Clear activeParentId if the block it references was removed by this undo
+    if (activeParentId && !previous.some((b) => b.id === activeParentId)) {
+      setActiveParentId(null);
+    }
+  };
+
+  const redo = () => {
+    if (future.length === 0) return;
+    const next = future[0];
+    const newFuture = future.slice(1);
+    setFuture(newFuture);
+    setPast([...past, blocks]);
+    setBlocks(next);
+    // Clear activeParentId if the block it references no longer exists after redo
+    if (activeParentId && !next.some((b) => b.id === activeParentId)) {
+      setActiveParentId(null);
+    }
+  };
+
 
   useEffect(() => {
     try {
@@ -133,42 +187,11 @@ export default function App() {
         }
       }
     } catch {}
+    // Signal that initial hydration is complete — auto-save may now run safely
+    hasHydrated.current = true;
   }, []);
 
-  // Dark mode state
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    let initialDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    try {
-      const saved = localStorage.getItem('flowforge_dark_mode');
-      if (saved) initialDark = saved === 'true';
-    } catch {
-      // Ignore storage errors
-    }
-    
-    // Apply class pre-paint
-    if (initialDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    return initialDark;
-  });
 
-  useEffect(() => {
-    // Preserve ongoing theme synchronization after mount
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    try {
-      localStorage.setItem('flowforge_dark_mode', String(isDarkMode));
-    } catch {
-      // Ignore storage errors
-    }
-  }, [isDarkMode]);
-
-  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   const emitUpdateDebounced = useRef(
     debounce((block: Block) => socket.emit('update-block', block), 300)
@@ -246,7 +269,7 @@ export default function App() {
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     const newToast: ToastConfig = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: crypto.randomUUID(),
       message,
       type,
     };
@@ -259,13 +282,10 @@ export default function App() {
 
   // Add block from form (Left panel)
   const handleAddBlock = (blockData: Omit<Block, 'id'>) => {
-    const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
+    const newId = `block-${crypto.randomUUID()}`;
 
-    // Pure computation — no external variable mutation, safe for React Strict Mode
-    const computeAddResult = (prev: Block[]) => {
-      let updated = [...prev];
-      let insertedTargetId: string | undefined = undefined;
-      let modifiedActiveBlock: Block | undefined = undefined;
+    let updated = [...blocks];
+    let insertedTargetId: string | undefined = undefined;
 
       if (activeParentId) {
         const activeIdx = updated.findIndex((b) => b.id === activeParentId);
@@ -301,14 +321,7 @@ export default function App() {
     let emitNewBlock: Block | undefined;
     let emitModifiedBlock: Block | undefined;
 
-    flushSync(() => {
-      setBlocks((prev) => {
-        const result = computeAddResult(prev);
-        emitNewBlock = result.newBlock;
-        emitModifiedBlock = result.modifiedActiveBlock;
-        return result.nextBlocks;
-      });
-    });
+      pushState([...updated, newBlock]);
 
     if (emitNewBlock) socket.emit('add-block', emitNewBlock);
     if (emitModifiedBlock) socket.emit('update-block', emitModifiedBlock);
@@ -323,8 +336,7 @@ export default function App() {
 
   // Update node details (Right panel)
   const handleUpdateBlock = (updatedBlock: Block) => {
-    setBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
-    emitUpdateDebounced(updatedBlock);
+    pushState(blocks.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
   };
 
   // Delete block
@@ -333,29 +345,19 @@ export default function App() {
     const block = blocks.find((b) => b.id === id);
     if (!block) return;
 
-    const blocksToUpdate: Block[] = [];
-    blocks.forEach((b) => {
-      if (b.id === id) return;
-      let changed = false;
+    // Filter out deleted block
+    let updated = blocks.filter((b) => b.id !== id);
+
+    // Clean up references to this deleted block from other blocks
+    const finalBlocks = updated.map((b) => {
       const next = { ...b };
-      if (next.targetId === id) { next.targetId = ''; changed = true; }
-      if (next.yesTargetId === id) { next.yesTargetId = ''; changed = true; }
-      if (next.noTargetId === id) { next.noTargetId = ''; changed = true; }
-      if (changed) {
-        blocksToUpdate.push(next);
-      }
+      if (next.targetId === id) next.targetId = '';
+      if (next.yesTargetId === id) next.yesTargetId = '';
+      if (next.noTargetId === id) next.noTargetId = '';
+      return next;
     });
 
-    blocksToUpdate.forEach(b => socket.emit('update-block', b));
-    socket.emit('delete-block', id);
-
-    setBlocks((prev) => {
-      let updated = prev.filter((b) => b.id !== id);
-      return updated.map((b) => {
-        const updateMatches = blocksToUpdate.find(u => u.id === b.id);
-        return updateMatches ? updateMatches : b;
-      });
-    });
+    pushState(finalBlocks);
 
     if (selectedBlockId === id) {
       setSelectedBlockId(null);
@@ -368,12 +370,10 @@ export default function App() {
 
   // Duplicate block (Ctrl+D / Cmd+D)
   const handleDuplicateBlock = (id: string) => {
-    emitUpdateDebounced.flush();
-    const original = blocks.find((b) => b.id === id);
-    if (!original) return;
+    const targetBlock = blocks.find((b) => b.id === id);
+    if (!targetBlock) return;
 
-    const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
-    
+    const newId = `block-${crypto.randomUUID()}`;
     const duplicatedBlock: Block = {
       ...original,
       id: newId,
@@ -387,23 +387,28 @@ export default function App() {
     const modifiedOriginal: Block | undefined =
       original.type !== 'decision' ? { ...original, targetId: newId } : undefined;
 
-    socket.emit('add-block', duplicatedBlock);
-    if (modifiedOriginal) {
-      socket.emit('update-block', modifiedOriginal);
+    const idx = blocks.findIndex((b) => b.id === id);
+    if (idx === -1) {
+      pushState([...blocks, duplicatedBlock]);
+      return;
     }
 
-    // Append locally — matches the remote onBlockAdded append behaviour so both
-    // local and remote clients end up with identical array order.
-    setBlocks((prev) => {
-      const updated = modifiedOriginal
-        ? prev.map((b) => (b.id === id ? modifiedOriginal : b))
-        : [...prev];
-      return [...updated, duplicatedBlock];
-    });
+    const updated = [...blocks];
+    if (original.type !== 'decision') {
+      duplicatedBlock.targetId = original.targetId;
+      updated[idx] = { ...original, targetId: newId };
+    }
+
+    updated.splice(idx + 1, 0, duplicatedBlock);
+    pushState(updated);
 
     setSelectedBlockId(newId);
-    setActiveParentId(newId);
-    showToast(`Duplicated "${original.label}"`, 'success');
+    if (canAcceptChild) {
+      setActiveParentId(newId);
+    } else {
+      setActiveParentId(null);
+    }
+    showToast(`Duplicated "${targetBlock.label}"`, 'success');
   };
 
   // Select and chain next process block
@@ -443,11 +448,14 @@ export default function App() {
     blocks,
     selectedBlockId,
     currentWorkspace,
+    showShortcutsHelp,
     onSelectBlock: setSelectedBlockId,
     onDeleteBlock: handleDeleteBlock,
     onDuplicateBlock: handleDuplicateBlock,
     onSaveWorkspace: handleSaveWorkspace,
     onToggleShortcutsHelp: () => setShowShortcutsHelp((prev) => !prev),
+    onUndo: undo,
+    onRedo: redo,
   });
 
   const handleLoadWorkspace = (name: string) => {
@@ -461,6 +469,8 @@ export default function App() {
             return;
           }
           setBlocks(parsed[name]);
+          setPast([]);
+          setFuture([]);
           setCurrentWorkspace(name);
           setSelectedBlockId(null);
           setActiveParentId(null);
@@ -537,7 +547,7 @@ export default function App() {
             const currentKeys = Object.keys(parsedStorage);
             
             while (currentKeys.includes(newName) || isInvalidWorkspaceName(newName)) {
-                newName = `${baseName}-${Math.random().toString(36).substring(2, 6)}`;
+                newName = `${baseName}-${crypto.randomUUID().slice(0, 4)}`;
             }
             
             try {
@@ -546,6 +556,8 @@ export default function App() {
                 
                 // Only update React state after successfully persisting to localStorage
                 setBlocks(parsed);
+                setPast([]);
+                setFuture([]);
                 setSelectedBlockId(null);
                 setActiveParentId(null);
                 setWorkspaces([...currentKeys, newName]);
@@ -596,8 +608,7 @@ export default function App() {
   };
 
   const handleNewFlowchart = () => {
-    emitUpdateDebounced.flush();
-    setBlocks([]);
+    pushState([]);
     setSelectedBlockId(null);
     setActiveParentId(null);
     socket.emit('clear-blocks');
@@ -634,7 +645,7 @@ export default function App() {
         workspaces={workspaces}
         currentWorkspace={currentWorkspace}
         onAddFirstBlock={() => {
-          setBlocks(initialDemoBlocks);
+          pushState(initialDemoBlocks);
           setSelectedBlockId('demo-1');
           showToast('Loaded vertical flow template!');
         }}
