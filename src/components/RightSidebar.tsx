@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useId } from 'react';
+import React, { useId, useState, useEffect } from 'react';
 import { Trash2, Link, CornerDownRight, ArrowRight, CornerRightDown } from 'lucide-react';
 import { Block, ShapeType } from '../types';
 
@@ -28,6 +28,16 @@ export default function RightSidebar({
   const yesTargetSelectId = useId();
   const noTargetSelectId = useId();
 
+  // localLabel must be declared before any early returns to satisfy Rules of Hooks
+  const [localLabel, setLocalLabel] = useState('');
+
+  // Sync local label state when the selected block changes
+  useEffect(() => {
+    if (selectedBlock) {
+      setLocalLabel(selectedBlock.label);
+    }
+  }, [selectedBlock?.id, selectedBlock?.label]);
+
   if (!selectedBlock) {
     return (
       <aside className="w-[260px] h-full bg-white dark:bg-slate-800 border-l border-gray-100 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center p-6 text-center shrink-0 select-none z-20 relative">
@@ -36,7 +46,7 @@ export default function RightSidebar({
         </div>
         <h3 className="text-xs font-bold text-gray-700 dark:text-slate-300 tracking-tight">Inspect Properties</h3>
         <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1 max-w-[180px] leading-normal">
-          Select a block from the list or canvas to edit its properties & routing
+          Select a block from the list or canvas to edit its properties &amp; routing
         </p>
       </aside>
     );
@@ -59,7 +69,19 @@ export default function RightSidebar({
   };
 
   const handleLabelChange = (val: string) => {
-    onUpdateBlock({ ...selectedBlock, label: val });
+    setLocalLabel(val);
+  };
+
+  const handleLabelBlur = () => {
+    if (selectedBlock && localLabel !== selectedBlock.label) {
+      onUpdateBlock({ ...selectedBlock, label: localLabel });
+    }
+  };
+
+  const handleLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    }
   };
 
   const handleTargetChange = (val: string) => {
@@ -107,8 +129,10 @@ export default function RightSidebar({
           <input
             id={labelInputId}
             type="text"
-            value={selectedBlock.label}
+            value={localLabel}
             onChange={(e) => handleLabelChange(e.target.value)}
+            onBlur={handleLabelBlur}
+            onKeyDown={handleLabelKeyDown}
             className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 font-sans font-medium focus:ring-1 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-gray-50/50 dark:bg-slate-900/50 hover:bg-gray-50/20 dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-800 text-gray-900 dark:text-slate-100"
           />
         </div>
