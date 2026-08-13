@@ -161,6 +161,7 @@ export default function LeftSidebar({
               type="button"
               onClick={onCancelActiveParent}
               title="Cancel chain connection"
+              aria-label="Cancel chain connection"
               className="p-1 hover:bg-indigo-100 rounded-md text-indigo-500 hover:text-indigo-700 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
@@ -280,9 +281,10 @@ export default function LeftSidebar({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                       <button
                         title="Edit Block"
+                        aria-label="Edit Block"
                         onClick={(e) => {
                           e.stopPropagation();
                           onSelectBlock(block.id);
@@ -293,6 +295,7 @@ export default function LeftSidebar({
                       </button>
                       <button
                         title="Delete Block"
+                        aria-label="Delete Block"
                         onClick={(e) => {
                           e.stopPropagation();
                           onDeleteBlock(block.id);

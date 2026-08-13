@@ -612,6 +612,7 @@ export default function CenterCanvas({
           <button
             onClick={toggleDarkMode}
             title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
             className="px-2 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
