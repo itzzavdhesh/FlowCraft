@@ -4,6 +4,13 @@
  */
 
 export type ShapeType = 'terminator' | 'process' | 'decision' | 'io';
+export type LayoutDirection = 'vertical' | 'horizontal';
+
+export interface Branch {
+  id: string;
+  label: string;
+  targetId?: string;
+}
 
 export interface Block {
   id: string;
@@ -14,7 +21,9 @@ export interface Block {
   noLabel?: string;  // For decision nodes
   yesTargetId?: string; // Target for "Yes" branch
   noTargetId?: string;  // Target for "No" branch
-  positionOffset?: { x: number; y: number }; // For manual drag offsets
+  groupId?: string;      // Optional parent group ID
+  groupLabel?: string;   // Optional parent group label
+  isGroupCollapsed?: boolean; // Optional group collapse state
 }
 
 export interface CanvasNode {
