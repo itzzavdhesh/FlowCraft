@@ -12,6 +12,29 @@ export const ROW_HEIGHT = 150;
 export const DIAMOND_SIZE = 92;
 export const DIAMOND_HALF_DIAG = 65;
 
+/**
+ * Finds the true root block of the flowchart (a block with no incoming connections).
+ * Prefers 'terminator' type nodes (e.g. 'Start') if multiple roots exist.
+ */
+export function findRootBlock(blocks: Block[]): Block | null {
+  if (blocks.length === 0) return null;
+
+  const targetIds = new Set<string>();
+  blocks.forEach((b) => {
+    if (b.targetId && b.targetId !== b.id) targetIds.add(b.targetId);
+    if (b.yesTargetId && b.yesTargetId !== b.id) targetIds.add(b.yesTargetId);
+    if (b.noTargetId && b.noTargetId !== b.id) targetIds.add(b.noTargetId);
+  });
+
+  const roots = blocks.filter((b) => !targetIds.has(b.id));
+  if (roots.length > 0) {
+    const terminatorRoot = roots.find((b) => b.type === 'terminator');
+    return terminatorRoot || roots[0];
+  }
+
+  return blocks[0];
+}
+
 
 /**
  * Automatically calculates visual X and Y layout coordinates for a list of blocks.
@@ -20,11 +43,82 @@ export const DIAMOND_HALF_DIAG = 65;
 export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirection = 'vertical'): CanvasNode[] {
   if (blocks.length === 0) return [];
 
+  // Pre-process blocks to handle collapsed groups:
+  const collapsedGroupIds = new Set<string>();
+  blocks.forEach(b => {
+    if (b.groupId && b.isGroupCollapsed) {
+      collapsedGroupIds.add(b.groupId);
+    }
+  });
+
+  let processedBlocks: Block[] = [];
+  const groupPlaceholders = new Map<string, Block>();
+
+  // Initialize group placeholder blocks
+  collapsedGroupIds.forEach(gId => {
+    const firstInGroup = blocks.find(b => b.groupId === gId);
+    groupPlaceholders.set(gId, {
+      id: `group-collapsed-${gId}`,
+      type: 'process',
+      label: (firstInGroup?.groupLabel || gId) + " (Collapsed)",
+      groupId: gId,
+      groupLabel: firstInGroup?.groupLabel || gId,
+      isGroupCollapsed: true,
+      targetId: '',
+    });
+  });
+
+  // Filter and map connections
+  blocks.forEach(b => {
+    if (b.groupId && collapsedGroupIds.has(b.groupId)) {
+      const placeholder = groupPlaceholders.get(b.groupId)!;
+      const checkAndSetExternalTarget = (tgtId: string | undefined) => {
+        if (tgtId && tgtId !== b.id) {
+          const tgtBlock = blocks.find(x => x.id === tgtId);
+          if (tgtBlock && tgtBlock.groupId !== b.groupId) {
+            placeholder.targetId = tgtId;
+          }
+        }
+      };
+
+      if (b.type === 'decision') {
+        checkAndSetExternalTarget(b.yesTargetId);
+        checkAndSetExternalTarget(b.noTargetId);
+      } else {
+        checkAndSetExternalTarget(b.targetId);
+      }
+    } else {
+      const mappedBlock = { ...b };
+      const mapTarget = (tgtId: string | undefined): string | undefined => {
+        if (tgtId) {
+          const tgtBlock = blocks.find(x => x.id === tgtId);
+          if (tgtBlock && tgtBlock.groupId && collapsedGroupIds.has(tgtBlock.groupId)) {
+            return `group-collapsed-${tgtBlock.groupId}`;
+          }
+        }
+        return tgtId;
+      };
+
+      if (mappedBlock.type === 'decision') {
+        mappedBlock.yesTargetId = mapTarget(mappedBlock.yesTargetId);
+        mappedBlock.noTargetId = mapTarget(mappedBlock.noTargetId);
+      } else {
+        mappedBlock.targetId = mapTarget(mappedBlock.targetId);
+      }
+
+      processedBlocks.push(mappedBlock);
+    }
+  });
+
+  groupPlaceholders.forEach(placeholder => {
+    processedBlocks.push(placeholder);
+  });
+
   // 1. Identify roots and parents for each block
   const incomingMap = new Map<string, number>();
   const parentsMap = new Map<string, string[]>();
   
-  blocks.forEach((b) => {
+  processedBlocks.forEach((b) => {
     incomingMap.set(b.id, 0);
     parentsMap.set(b.id, []);
   });
@@ -83,11 +177,11 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
   });
 
   // Find a good starting node (root with 0 incoming, or terminator, or just first node)
-  let rootId = blocks[0].id;
+  let rootId = processedBlocks[0]?.id || '';
   let minIncoming = Infinity;
   
   // Prefer a root with 0 incoming edges
-  for (const b of blocks) {
+  for (const b of processedBlocks) {
     const inc = incomingMap.get(b.id) || 0;
     if (inc === 0) {
       rootId = b.id;
@@ -101,10 +195,10 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
 
   const layoutMap = new Map<string, { row: number; col: number }>();
   const occupied = new Set<string>();
-  const pending = new Set<string>(blocks.map(b => b.id));
+  const pending = new Set<string>(processedBlocks.map(b => b.id));
 
   let iterations = 0;
-  const maxIterations = blocks.length * 10; // safety ceiling
+  const maxIterations = processedBlocks.length * 10; // safety ceiling
 
   while (pending.size > 0 && iterations < maxIterations) {
     iterations++;
@@ -136,7 +230,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
   }
 
   // Handle remaining unconnected blocks
-  blocks.forEach((b) => {
+  processedBlocks.forEach((b) => {
     if (!layoutMap.has(b.id)) {
       let row = 0;
       while (occupied.has(`${row},0`)) {
@@ -149,7 +243,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
 
   // Helper function to place an individual block
   function placeBlock(id: string, placedParents: string[]) {
-    const block = blocks.find(b => b.id === id);
+    const block = processedBlocks.find(b => b.id === id);
     if (!block) return;
 
     let row = 0;
@@ -164,7 +258,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
     } else if (placedParents.length === 1) {
       const pId = placedParents[0];
       const parentCoord = layoutMap.get(pId)!;
-      const parentBlock = blocks.find(b => b.id === pId);
+      const parentBlock = processedBlocks.find(b => b.id === pId);
       
       if (parentBlock?.type === 'decision') {
         if (parentBlock.yesTargetId === id) {
@@ -219,7 +313,7 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
 
   // Convert row and col to absolute X and Y coordinates
   // Start from a base offset and center X around canvas
-  return blocks.map((block) => {
+  return processedBlocks.map((block) => {
     const { row, col } = layoutMap.get(block.id) || { row: 0, col: 0 };
     // col = 0 is centered, col = 1 is shifted right, etc.
     const x = 600 + col * COLUMN_WIDTH;

@@ -4,6 +4,7 @@
  */
 
 import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Play, 
   Save, 
@@ -60,6 +61,7 @@ export default function CenterCanvas({
   blocks,
   selectedBlockId,
   onSelectBlock,
+  onUpdateBlock,
   onSave,
   onLoad,
   onDeleteWorkspace,
@@ -85,24 +87,180 @@ export default function CenterCanvas({
   const nodes = calculateLayout(blocks, layoutDirection);
   const connections = calculateConnections(nodes, layoutDirection);
 
+  const [remoteCursors, setRemoteCursors] = useState<Record<string, { x: number; y: number }>>({});
+  const [remoteSelections, setRemoteSelections] = useState<Record<string, string>>({});
+  const [userColors, setUserColors] = useState<Record<string, string>>({});
+  
+  const getUserColor = useCallback((userId: string) => {
+    setUserColors(prev => {
+      if (prev[userId]) return prev;
+      const colors = ['#f43f5e', '#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4'];
+      const color = colors[Object.keys(prev).length % colors.length];
+      return { ...prev, [userId]: color };
+    });
+  }, []);
+
+  useEffect(() => {
+    const onCursorUpdate = (data: { x: number; y: number; userId: string }) => {
+      setRemoteCursors(prev => ({ ...prev, [data.userId]: { x: data.x, y: data.y } }));
+      getUserColor(data.userId);
+    };
+
+    const onSelectionUpdate = (data: { selectedId: string | null; userId: string }) => {
+      setRemoteSelections(prev => {
+        const next = { ...prev };
+        if (data.selectedId === null) {
+          delete next[data.userId];
+        } else {
+          next[data.userId] = data.selectedId;
+        }
+        return next;
+      });
+      getUserColor(data.userId);
+    };
+    
+    const onUserLeft = (data: { userId: string }) => {
+      setRemoteCursors(prev => {
+        const next = { ...prev };
+        delete next[data.userId];
+        return next;
+      });
+      setRemoteSelections(prev => {
+        const next = { ...prev };
+        delete next[data.userId];
+        return next;
+      });
+    };
+
+    socket.on('cursor-update', onCursorUpdate);
+    socket.on('selection-update', onSelectionUpdate);
+    socket.on('user-left', onUserLeft);
+
+    return () => {
+      socket.off('cursor-update', onCursorUpdate);
+      socket.off('selection-update', onSelectionUpdate);
+      socket.off('user-left', onUserLeft);
+    };
+  }, [getUserColor]);
+
+  useEffect(() => {
+    socket.emit('node-select', { selectedId: selectedBlockId });
+  }, [selectedBlockId]);
+
+  // Identify unique expanded groups and their bounding boxes
+  const expandedGroups = new Map<string, { label: string; minX: number; minY: number; maxX: number; maxY: number }>();
+  nodes.forEach(node => {
+    if (node.block.groupId && !node.block.isGroupCollapsed) {
+      const gId = node.block.groupId;
+      const current = expandedGroups.get(gId) || {
+        label: node.block.groupLabel || gId,
+        minX: Infinity,
+        minY: Infinity,
+        maxX: -Infinity,
+        maxY: -Infinity,
+      };
+      current.minX = Math.min(current.minX, node.x);
+      current.minY = Math.min(current.minY, node.y);
+      current.maxX = Math.max(current.maxX, node.x + NODE_WIDTH);
+      current.maxY = Math.max(current.maxY, node.y + NODE_HEIGHT);
+      expandedGroups.set(gId, current);
+    }
+  });
+
   // Zoom & Pan states
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportMenuPos, setExportMenuPos] = useState({ top: 0, right: 0 });
+  const exportBtnRef = useRef<HTMLButtonElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const panStart = useRef({ x: 0, y: 0 });
 
+  const toggleExportMenu = () => {
+    if (!showExportMenu && exportBtnRef.current) {
+      const rect = exportBtnRef.current.getBoundingClientRect();
+      setExportMenuPos({
+        top: rect.bottom + 6,
+        right: Math.max(16, window.innerWidth - rect.right),
+      });
+    }
+    setShowExportMenu((prev) => !prev);
+  };
+
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(target) &&
+        exportBtnRef.current &&
+        !exportBtnRef.current.contains(target)
+      ) {
         setShowExportMenu(false);
       }
     };
+
+    const updateMenuPos = () => {
+      if (showExportMenu && exportBtnRef.current) {
+        const rect = exportBtnRef.current.getBoundingClientRect();
+        setExportMenuPos({
+          top: rect.bottom + 6,
+          right: Math.max(16, window.innerWidth - rect.right),
+        });
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    window.addEventListener('resize', updateMenuPos);
+    window.addEventListener('scroll', updateMenuPos, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', updateMenuPos);
+      window.removeEventListener('scroll', updateMenuPos, true);
+    };
+  }, [showExportMenu]);
+
+  // Focus management & focus trap for Keyboard Shortcuts modal
+  const previousActiveElement = useRef<HTMLElement | null>(null);
+  const modalCloseBtnRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (showShortcutsHelp) {
+      previousActiveElement.current = document.activeElement as HTMLElement | null;
+      const timer = setTimeout(() => {
+        modalCloseBtnRef.current?.focus();
+      }, 50);
+
+      const handleModalKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Tab' && modalRef.current) {
+          const focusables = modalRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+          if (focusables.length === 0) return;
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      };
+
+      document.addEventListener('keydown', handleModalKeyDown);
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener('keydown', handleModalKeyDown);
+        previousActiveElement.current?.focus();
+      };
+    }
+  }, [showShortcutsHelp]);
 
   // Mouse pan event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -126,7 +284,18 @@ export default function CenterCanvas({
     };
   };
 
+  const lastEmit = useRef<number>(0);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const now = Date.now();
+    if (now - lastEmit.current > 32 && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left - pan.x) / scale;
+      const y = (e.clientY - rect.top - pan.y) / scale;
+      socket.volatile.emit('cursor-move', { x, y });
+      lastEmit.current = now;
+    }
+
     if (!isPanning) return;
     const newX = e.clientX - panStart.current.x;
     const newY = e.clientY - panStart.current.y;
@@ -164,15 +333,14 @@ export default function CenterCanvas({
     };
   }, []);
 
-  const minWidth = 1200;
-  const minHeight = 800;
-
   // Determine bounds of the layout to ensure the canvas scroll area fits all nodes comfortably
   // Set minimum height and width larger than standard viewports to guarantee spacious scroll bounds
+  const minWidth = 1200;
+  const minHeight = 800;
   let minLayoutX = 0;
   let minLayoutY = 0;
-  let maxLayoutX = minWidth;
-  let maxLayoutY = minHeight;
+  let maxLayoutX = MIN_WIDTH;
+  let maxLayoutY = MIN_HEIGHT;
 
   nodes.forEach(node => {
     minLayoutX = Math.min(minLayoutX, node.x);
@@ -240,8 +408,8 @@ export default function CenterCanvas({
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      const canvasWidth = canvasRef.current.clientWidth || minWidth;
-      const canvasHeight = canvasRef.current.clientHeight || minHeight;
+      const canvasWidth = canvasRef.current.clientWidth || 3000;
+      const canvasHeight = canvasRef.current.clientHeight || 2000;
       const ratio = Math.min(pdfWidth / canvasWidth, pdfHeight / canvasHeight);
 
       const width = canvasWidth * ratio;
@@ -381,10 +549,12 @@ export default function CenterCanvas({
     }
   };
 
-  const getShapeStyle = (type: string, isSelected: boolean) => {
+  const getShapeStyle = (type: string, isSelected: boolean, remoteColor?: string) => {
     const baseClass = "absolute transition-all duration-250 cursor-pointer flex items-center justify-center border-2 shadow-md ";
     const selectedClass = isSelected 
       ? "border-indigo-600 dark:border-indigo-400 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 shadow-lg scale-102"
+      : remoteColor
+      ? "shadow-lg scale-101 border-transparent"
       : "border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 hover:shadow-lg hover:scale-101";
 
     switch (type) {
@@ -405,8 +575,8 @@ export default function CenterCanvas({
   return (
     <div className="flex-grow h-full flex flex-col min-w-0 bg-[#fbfbfc] dark:bg-slate-900">
       {/* Top Toolbar */}
-      <header className="h-[64px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 shadow-xs px-4 flex items-center justify-between shrink-0 select-none z-10 overflow-x-auto overflow-y-visible custom-scrollbar flex-nowrap min-w-0 max-w-full">
-        <div className="flex items-center gap-2 shrink-0">
+      <header className="h-[64px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 shadow-xs px-4 flex items-center justify-between shrink-0 select-none z-10 relative min-w-0 max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar flex-nowrap">
+        <div className="flex items-center gap-2 shrink-0 max-w-[45%] overflow-x-auto custom-scrollbar">
           <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Workspace</span>
           <span className="text-gray-300 dark:text-slate-600">/</span>
           <select 
@@ -498,10 +668,14 @@ export default function CenterCanvas({
           <div className="h-4 w-px bg-gray-200 dark:bg-slate-600 mx-0.5"></div>
 
           {/* Unified Sleek Export Dropdown */}
-          <div className="relative" ref={exportMenuRef}>
+          <div className="relative">
             <button
+              ref={exportBtnRef}
               id="toolbar-btn-export-menu"
-              onClick={() => setShowExportMenu((prev) => !prev)}
+              onClick={toggleExportMenu}
+              aria-expanded={showExportMenu}
+              aria-haspopup="true"
+              aria-controls="export-menu-dropdown"
               title="Export diagram in various formats"
               className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-150 cursor-pointer"
             >
@@ -509,46 +683,62 @@ export default function CenterCanvas({
               <span>Export</span>
               <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${showExportMenu ? 'rotate-180' : ''}`} />
             </button>
-
-            {showExportMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                <button
-                  onClick={() => { handleExportPNG(); setShowExportMenu(false); }}
-                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <FileImage className="w-4 h-4 text-indigo-500" />
-                  <span>Export PNG Image</span>
-                </button>
-                <button
-                  onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
-                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <FileText className="w-4 h-4 text-rose-500" />
-                  <span>Export PDF Document</span>
-                </button>
-                <button
-                  onClick={() => { handleExportPPTX(); setShowExportMenu(false); }}
-                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Presentation className="w-4 h-4 text-amber-500" />
-                  <span className="flex items-center gap-1">
-                    Export PPTX
-                    <Sparkles className="w-3 h-3 text-amber-500 fill-amber-200 animate-pulse" />
-                  </span>
-                </button>
-                <div className="my-1 border-t border-gray-100 dark:border-slate-700"></div>
-                <button
-                  onClick={() => { onExportJSON(); setShowExportMenu(false); }}
-                  className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Download className="w-4 h-4 text-emerald-500" />
-                  <span>Export JSON Blueprint</span>
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </header>
+
+      {/* Portalled Export Dropdown Menu */}
+      {showExportMenu && createPortal(
+        <div
+          ref={exportMenuRef}
+          id="export-menu-dropdown"
+          role="menu"
+          style={{
+            position: 'fixed',
+            top: `${exportMenuPos.top}px`,
+            right: `${exportMenuPos.right}px`,
+          }}
+          className="w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+        >
+          <button
+            role="menuitem"
+            onClick={() => { handleExportPNG(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <FileImage className="w-4 h-4 text-indigo-500" />
+            <span>Export PNG Image</span>
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <FileText className="w-4 h-4 text-rose-500" />
+            <span>Export PDF Document</span>
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => { handleExportPPTX(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Presentation className="w-4 h-4 text-amber-500" />
+            <span className="flex items-center gap-1">
+              Export PPTX
+              <Sparkles className="w-3 h-3 text-amber-500 fill-amber-200 animate-pulse" />
+            </span>
+          </button>
+          <div className="my-1 border-t border-gray-100 dark:border-slate-700"></div>
+          <button
+            role="menuitem"
+            onClick={() => { onExportJSON(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-emerald-500" />
+            <span>Export JSON Blueprint</span>
+          </button>
+        </div>,
+        document.body
+      )}
 
       {/* Grid Canvas area with zoom and pan interaction */}
       <div 
@@ -599,6 +789,51 @@ export default function CenterCanvas({
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
               }}
             >
+              {/* Bounding containers for expanded groups */}
+              {Array.from(expandedGroups.entries()).map(([gId, group]) => {
+                const width = (group.maxX - group.minX) + 48;
+                const height = (group.maxY - group.minY) + 70;
+                const left = group.minX - 24;
+                const top = group.minY - 46;
+
+                return (
+                  <div
+                    key={`group-card-${gId}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${left}px`,
+                      top: `${top}px`,
+                      width: `${width}px`,
+                      height: `${height}px`,
+                      pointerEvents: 'none',
+                    }}
+                    className="border-2 border-dashed border-indigo-200 bg-indigo-50/10 rounded-2xl z-0"
+                  >
+                    <div className="absolute top-2.5 left-4 flex items-center gap-2 pointer-events-auto select-none">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-500 bg-indigo-50/80 px-2 py-0.5 rounded-md">
+                        {group.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          blocks.forEach(b => {
+                            if (b.groupId === gId) {
+                              onUpdateBlock({
+                                ...b,
+                                isGroupCollapsed: true
+                              });
+                            }
+                          });
+                        }}
+                        className="px-1.5 py-0.5 bg-white hover:bg-indigo-50 text-[9px] font-bold text-indigo-600 border border-indigo-150 rounded shadow-xs cursor-pointer transition-colors"
+                      >
+                        Collapse
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
               {/* SVG Vectors connecting elements */}
               <svg className="absolute inset-0 pointer-events-none w-full h-full z-0 overflow-visible">
                 <defs>
@@ -746,6 +981,10 @@ export default function CenterCanvas({
               {nodes.map((node) => {
                 const isSelected = selectedBlockId === node.block.id;
                 
+                // Determine remote selection color
+                const remoteUserIds = Object.entries(remoteSelections).filter(([_, id]) => id === node.block.id).map(([userId]) => userId);
+                const remoteColor = remoteUserIds.length > 0 ? userColors[remoteUserIds[0]] : undefined;
+                
                 // Custom structures for specialized Shapes
                 if (node.block.type === 'decision') {
                   return (
@@ -768,11 +1007,14 @@ export default function CenterCanvas({
                           height: `${DIAMOND_SIZE}px`,
                           left: `${(NODE_WIDTH - DIAMOND_SIZE) / 2}px`,
                           top: `${(NODE_HEIGHT - DIAMOND_SIZE) / 2}px`,
+                          ...(remoteColor && !isSelected ? { borderColor: remoteColor, boxShadow: `0 0 0 4px ${remoteColor}40` } : {})
                         }}
                         className={`absolute border-2 shadow-md transition-all duration-200 bg-white dark:bg-slate-800 rotate-45 ${
                           isSelected 
                             ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102' 
-                            : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
+                            : remoteColor 
+                              ? 'shadow-lg scale-101 border-transparent'
+                              : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
                         }`}
                       />
                       {/* Text wrapper kept upright at the same coordinates, centered perfectly */}
@@ -812,10 +1054,13 @@ export default function CenterCanvas({
                         className={`absolute inset-0 transition-all duration-250 bg-white dark:bg-slate-800 border-2 rounded-md shadow-md ${
                           isSelected 
                             ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102' 
-                            : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
+                            : remoteColor
+                              ? 'shadow-lg scale-101 border-transparent'
+                              : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
                         }`}
                         style={{
                           transform: 'skewX(-15deg)',
+                          ...(remoteColor && !isSelected ? { borderColor: remoteColor, boxShadow: `0 0 0 4px ${remoteColor}40` } : {})
                         }}
                       />
                       
@@ -842,8 +1087,9 @@ export default function CenterCanvas({
                       top: `${node.y}px`,
                       width: `${NODE_WIDTH}px`,
                       height: `${NODE_HEIGHT}px`,
+                      ...(remoteColor && !isSelected ? { borderColor: remoteColor, boxShadow: `0 0 0 4px ${remoteColor}40` } : {})
                     }}
-                    className={getShapeStyle(node.block.type, isSelected)}
+                    className={getShapeStyle(node.block.type, isSelected, remoteColor)}
                   >
                     <div className="px-4 text-center">
                       <span className="text-xs font-bold line-clamp-2 leading-tight">
@@ -855,13 +1101,41 @@ export default function CenterCanvas({
               })}
             </div>
 
+            {/* Render Remote Cursors */}
+            {Object.entries(remoteCursors).map(([userId, pos]) => {
+              const color = userColors[userId] || '#6366f1';
+              return (
+                <div
+                  key={userId}
+                  className="absolute pointer-events-none z-50 transition-all duration-75"
+                  style={{
+                    left: 0,
+                    top: 0,
+                    transform: `translate(${pan.x + pos.x * scale}px, ${pan.y + pos.y * scale}px)`,
+                  }}
+                >
+                  <MousePointer 
+                    className="w-5 h-5 drop-shadow-md" 
+                    fill={color}
+                    color="white" 
+                    strokeWidth={1.5} 
+                  />
+                  <div
+                    className="absolute top-5 left-3 px-2 py-0.5 rounded-md text-[10px] font-bold text-white shadow-sm whitespace-nowrap"
+                    style={{ backgroundColor: color }}
+                  >
+                    Guest {userId.substring(0, 4)}
+                  </div>
+                </div>
+              );
+            })}
+
             {/* Float Zoom and Pan Control HUD Panel */}
             <div className="zoom-controls absolute bottom-6 right-6 flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-xl shadow-lg border border-gray-150 z-20 select-none">
               <button
                 onClick={() => setScale(prev => Math.max(0.25, parseFloat((prev - 0.1).toFixed(2))))}
                 disabled={scale <= 0.25}
                 title="Zoom Out"
-                aria-label="Zoom Out"
                 className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 dark:border-gray-700 hover:border-gray-350 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
                 <ZoomOut className="w-4 h-4" />
@@ -873,7 +1147,6 @@ export default function CenterCanvas({
                 onClick={() => setScale(prev => Math.min(3, parseFloat((prev + 0.1).toFixed(2))))}
                 disabled={scale >= 3}
                 title="Zoom In"
-                aria-label="Zoom In"
                 className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 dark:border-gray-700 hover:border-gray-350 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
                 <ZoomIn className="w-4 h-4" />
@@ -899,14 +1172,14 @@ export default function CenterCanvas({
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 p-6 max-w-sm w-full mx-4 transform transition-all scale-100">
             <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">New Flowchart Confirmation</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500 leading-relaxed mb-6">
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-6">
               Start a new flowchart? Current work will be lost.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
                 id="btn-confirm-cancel"
                 onClick={() => setShowConfirmModal(false)}
-                className="px-3.5 py-2 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:text-gray-100 rounded-lg transition-all cursor-pointer"
+                className="px-3.5 py-2 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-lg transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -929,7 +1202,13 @@ export default function CenterCanvas({
 
       {/* Keyboard Shortcuts Help Modal */}
       {showShortcutsHelp && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div
+          ref={modalRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shortcuts-modal-title"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
+        >
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 max-w-md w-full p-6 transform transition-all scale-100">
             <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-slate-700">
               <div className="flex items-center gap-2.5">
@@ -937,12 +1216,16 @@ export default function CenterCanvas({
                   <Keyboard className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100">Keyboard Shortcuts</h3>
+                  <h3 id="shortcuts-modal-title" className="text-sm font-bold text-gray-900 dark:text-slate-100">
+                    Keyboard Shortcuts
+                  </h3>
                   <p className="text-[11px] text-gray-400 dark:text-slate-400">Power-user efficiency cheatsheet</p>
                 </div>
               </div>
               <button
+                ref={modalCloseBtnRef}
                 onClick={onToggleShortcutsHelp}
+                aria-label="Close keyboard shortcuts"
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />

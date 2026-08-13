@@ -65,7 +65,6 @@ function ToastItem({ toast, onClose }: { toast: ToastConfig; onClose: (id: strin
       </div>
       <button
         onClick={() => onClose(toast.id)}
-        aria-label="Close Toast"
         className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 dark:text-gray-400 dark:text-gray-500 transition-colors cursor-pointer shrink-0"
       >
         <X className="w-4 h-4" />

@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Zap, Edit2, Trash2, Plus, X } from 'lucide-react';
+import { Zap, Edit2, Trash2, Plus, X, Sparkles } from 'lucide-react';
 import { ShapeType, Block } from '../types';
 
 interface LeftSidebarProps {
@@ -15,6 +15,8 @@ interface LeftSidebarProps {
   onDeleteBlock: (id: string) => void;
   activeParentId: string | null;
   onCancelActiveParent: () => void;
+  onLoadAIBlocks?: (blocks: Block[]) => void;
+  showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
 }
 
 export default function LeftSidebar({
@@ -25,6 +27,8 @@ export default function LeftSidebar({
   onDeleteBlock,
   activeParentId,
   onCancelActiveParent,
+  onLoadAIBlocks,
+  showToast,
 }: LeftSidebarProps) {
   const [selectedType, setSelectedType] = useState<ShapeType>('terminator');
   const [blockLabel, setBlockLabel] = useState('');
@@ -32,6 +36,34 @@ export default function LeftSidebar({
   // Decision specific branch labels
   const [yesLabel, setYesLabel] = useState('Yes');
   const [noLabel, setNoLabel] = useState('No');
+
+  // AI Flow Generator States
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateAI = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
+      const data = await response.json();
+      if (response.ok && Array.isArray(data)) {
+        onLoadAIBlocks?.(data);
+        showToast?.("Successfully generated flowchart with Gemini AI!", "success");
+        setAiPrompt('');
+      } else {
+        showToast?.(data.error || "Failed to generate flowchart.", "error");
+      }
+    } catch (e: any) {
+      showToast?.(e.message || "Failed to connect to the generator service.", "error");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const activeParentBlock = blocks.find((b) => b.id === activeParentId);
 
@@ -268,7 +300,7 @@ export default function LeftSidebar({
                           e.stopPropagation();
                           onDeleteBlock(block.id);
                         }}
-                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900/30 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
