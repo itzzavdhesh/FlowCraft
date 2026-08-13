@@ -4,6 +4,7 @@
  */
 
 import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Play, 
   Save, 
@@ -17,52 +18,249 @@ import {
   Database,
   ZoomIn,
   ZoomOut,
-  FilePlus
+  FilePlus,
+  Moon,
+  Sun,
+  Trash2,
+  Download,
+  Upload,
+  Keyboard,
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import pptxgen from 'pptxgenjs';
-import { Block, CanvasNode } from '../types';
+import { Block, CanvasNode, LayoutDirection } from '../types';
 import { calculateLayout, calculateConnections, NODE_WIDTH, NODE_HEIGHT, DIAMOND_SIZE } from '../utils/layout';
 
 interface CenterCanvasProps {
   blocks: Block[];
   selectedBlockId: string | null;
   onSelectBlock: (id: string) => void;
-  onSave: () => void;
-  onLoad: () => void;
+  onSave: (name: string) => void;
+  onLoad: (name: string) => void;
+  onDeleteWorkspace: (name: string) => void;
   onExport: (format: 'png' | 'pdf' | 'pptx') => void;
+  onExportJSON: () => void;
+  onImportJSON: (file: File) => void;
   onNewFlowchart: () => void;
   onAddFirstBlock: () => void;
   showToast?: (message: string, type?: 'success' | 'info' | 'error') => void;
-  isCollaborative?: boolean;
+  isDarkMode: boolean;
+  toggleDarkMode: () => void;
+  workspaces: string[];
+  currentWorkspace: string;
+  layoutDirection: LayoutDirection;
+  onLayoutDirectionChange: (direction: LayoutDirection) => void;
+  showShortcutsHelp?: boolean;
+  onToggleShortcutsHelp?: () => void;
 }
 
 export default function CenterCanvas({
   blocks,
   selectedBlockId,
   onSelectBlock,
+  onUpdateBlock,
   onSave,
   onLoad,
+  onDeleteWorkspace,
   onExport,
+  onExportJSON,
+  onImportJSON,
   onNewFlowchart,
   onAddFirstBlock,
   showToast,
-  isCollaborative,
+  isDarkMode,
+  toggleDarkMode,
+  workspaces,
+  currentWorkspace,
+  layoutDirection,
+  onLayoutDirectionChange,
+  showShortcutsHelp = false,
+  onToggleShortcutsHelp,
 }: CenterCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Apply layout algorithm
-  const nodes = calculateLayout(blocks);
-  const connections = calculateConnections(nodes);
+  const nodes = calculateLayout(blocks, layoutDirection);
+  const connections = calculateConnections(nodes, layoutDirection);
+
+  const [remoteCursors, setRemoteCursors] = useState<Record<string, { x: number; y: number }>>({});
+  const [remoteSelections, setRemoteSelections] = useState<Record<string, string>>({});
+  const [userColors, setUserColors] = useState<Record<string, string>>({});
+  
+  const getUserColor = useCallback((userId: string) => {
+    setUserColors(prev => {
+      if (prev[userId]) return prev;
+      const colors = ['#f43f5e', '#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4'];
+      const color = colors[Object.keys(prev).length % colors.length];
+      return { ...prev, [userId]: color };
+    });
+  }, []);
+
+  useEffect(() => {
+    const onCursorUpdate = (data: { x: number; y: number; userId: string }) => {
+      setRemoteCursors(prev => ({ ...prev, [data.userId]: { x: data.x, y: data.y } }));
+      getUserColor(data.userId);
+    };
+
+    const onSelectionUpdate = (data: { selectedId: string | null; userId: string }) => {
+      setRemoteSelections(prev => {
+        const next = { ...prev };
+        if (data.selectedId === null) {
+          delete next[data.userId];
+        } else {
+          next[data.userId] = data.selectedId;
+        }
+        return next;
+      });
+      getUserColor(data.userId);
+    };
+    
+    const onUserLeft = (data: { userId: string }) => {
+      setRemoteCursors(prev => {
+        const next = { ...prev };
+        delete next[data.userId];
+        return next;
+      });
+      setRemoteSelections(prev => {
+        const next = { ...prev };
+        delete next[data.userId];
+        return next;
+      });
+    };
+
+    socket.on('cursor-update', onCursorUpdate);
+    socket.on('selection-update', onSelectionUpdate);
+    socket.on('user-left', onUserLeft);
+
+    return () => {
+      socket.off('cursor-update', onCursorUpdate);
+      socket.off('selection-update', onSelectionUpdate);
+      socket.off('user-left', onUserLeft);
+    };
+  }, [getUserColor]);
+
+  useEffect(() => {
+    socket.emit('node-select', { selectedId: selectedBlockId });
+  }, [selectedBlockId]);
+
+  // Identify unique expanded groups and their bounding boxes
+  const expandedGroups = new Map<string, { label: string; minX: number; minY: number; maxX: number; maxY: number }>();
+  nodes.forEach(node => {
+    if (node.block.groupId && !node.block.isGroupCollapsed) {
+      const gId = node.block.groupId;
+      const current = expandedGroups.get(gId) || {
+        label: node.block.groupLabel || gId,
+        minX: Infinity,
+        minY: Infinity,
+        maxX: -Infinity,
+        maxY: -Infinity,
+      };
+      current.minX = Math.min(current.minX, node.x);
+      current.minY = Math.min(current.minY, node.y);
+      current.maxX = Math.max(current.maxX, node.x + NODE_WIDTH);
+      current.maxY = Math.max(current.maxY, node.y + NODE_HEIGHT);
+      expandedGroups.set(gId, current);
+    }
+  });
 
   // Zoom & Pan states
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportMenuPos, setExportMenuPos] = useState({ top: 0, right: 0 });
+  const exportBtnRef = useRef<HTMLButtonElement>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
   const panStart = useRef({ x: 0, y: 0 });
+
+  const toggleExportMenu = () => {
+    if (!showExportMenu && exportBtnRef.current) {
+      const rect = exportBtnRef.current.getBoundingClientRect();
+      setExportMenuPos({
+        top: rect.bottom + 6,
+        right: Math.max(16, window.innerWidth - rect.right),
+      });
+    }
+    setShowExportMenu((prev) => !prev);
+  };
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(target) &&
+        exportBtnRef.current &&
+        !exportBtnRef.current.contains(target)
+      ) {
+        setShowExportMenu(false);
+      }
+    };
+
+    const updateMenuPos = () => {
+      if (showExportMenu && exportBtnRef.current) {
+        const rect = exportBtnRef.current.getBoundingClientRect();
+        setExportMenuPos({
+          top: rect.bottom + 6,
+          right: Math.max(16, window.innerWidth - rect.right),
+        });
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('resize', updateMenuPos);
+    window.addEventListener('scroll', updateMenuPos, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', updateMenuPos);
+      window.removeEventListener('scroll', updateMenuPos, true);
+    };
+  }, [showExportMenu]);
+
+  // Focus management & focus trap for Keyboard Shortcuts modal
+  const previousActiveElement = useRef<HTMLElement | null>(null);
+  const modalCloseBtnRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (showShortcutsHelp) {
+      previousActiveElement.current = document.activeElement as HTMLElement | null;
+      const timer = setTimeout(() => {
+        modalCloseBtnRef.current?.focus();
+      }, 50);
+
+      const handleModalKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Tab' && modalRef.current) {
+          const focusables = modalRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+          if (focusables.length === 0) return;
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      };
+
+      document.addEventListener('keydown', handleModalKeyDown);
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener('keydown', handleModalKeyDown);
+        previousActiveElement.current?.focus();
+      };
+    }
+  }, [showShortcutsHelp]);
 
   // Mouse pan event handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -86,7 +284,18 @@ export default function CenterCanvas({
     };
   };
 
+  const lastEmit = useRef<number>(0);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const now = Date.now();
+    if (now - lastEmit.current > 32 && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left - pan.x) / scale;
+      const y = (e.clientY - rect.top - pan.y) / scale;
+      socket.volatile.emit('cursor-move', { x, y });
+      lastEmit.current = now;
+    }
+
     if (!isPanning) return;
     const newX = e.clientX - panStart.current.x;
     const newY = e.clientY - panStart.current.y;
@@ -126,21 +335,42 @@ export default function CenterCanvas({
 
   // Determine bounds of the layout to ensure the canvas scroll area fits all nodes comfortably
   // Set minimum height and width larger than standard viewports to guarantee spacious scroll bounds
-  const minWidth = 1400;
-  const minHeight = 1000;
-  let maxWidth = minWidth;
-  let maxHeight = minHeight;
+  const minWidth = 1200;
+  const minHeight = 800;
+  let minLayoutX = 0;
+  let minLayoutY = 0;
+  let maxLayoutX = MIN_WIDTH;
+  let maxLayoutY = MIN_HEIGHT;
+
   nodes.forEach(node => {
-    maxWidth = Math.max(maxWidth, node.x + NODE_WIDTH + 250);
-    maxHeight = Math.max(maxHeight, node.y + NODE_HEIGHT + 250);
+    minLayoutX = Math.min(minLayoutX, node.x);
+    minLayoutY = Math.min(minLayoutY, node.y);
+    maxLayoutX = Math.max(maxLayoutX, node.x + NODE_WIDTH);
+    maxLayoutY = Math.max(maxLayoutY, node.y + NODE_HEIGHT);
   });
+
+
+  connections.forEach(conn => {
+    if (conn.bounds) {
+      minLayoutX = Math.min(minLayoutX, conn.bounds.minX);
+      minLayoutY = Math.min(minLayoutY, conn.bounds.minY);
+      maxLayoutX = Math.max(maxLayoutX, conn.bounds.maxX);
+      maxLayoutY = Math.max(maxLayoutY, conn.bounds.maxY);
+    }
+  });
+
+  const offsetX = minLayoutX < 50 ? Math.abs(minLayoutX) + 100 : 0;
+  const offsetY = minLayoutY < 50 ? Math.abs(minLayoutY) + 100 : 0;
+
+  const maxWidth = maxLayoutX + offsetX + 250;
+  const maxHeight = maxLayoutY + offsetY + 250;
 
   const handleExportPNG = async () => {
     if (!canvasRef.current) return;
     try {
       showToast?.('Generating PNG...', 'info');
       const dataUrl = await toPng(canvasRef.current, {
-        backgroundColor: '#f8f9fa',
+        backgroundColor: isDarkMode ? '#0f172a' : '#f8f9fa',
         style: {
           transform: 'translate(0px, 0px) scale(1)',
         },
@@ -162,7 +392,7 @@ export default function CenterCanvas({
     try {
       showToast?.('Generating PDF...', 'info');
       const dataUrl = await toPng(canvasRef.current, {
-        backgroundColor: '#f8f9fa',
+        backgroundColor: isDarkMode ? '#0f172a' : '#f8f9fa',
         style: {
           transform: 'translate(0px, 0px) scale(1)',
         },
@@ -178,8 +408,8 @@ export default function CenterCanvas({
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      const canvasWidth = canvasRef.current.clientWidth || minWidth;
-      const canvasHeight = canvasRef.current.clientHeight || minHeight;
+      const canvasWidth = canvasRef.current.clientWidth || 3000;
+      const canvasHeight = canvasRef.current.clientHeight || 2000;
       const ratio = Math.min(pdfWidth / canvasWidth, pdfHeight / canvasHeight);
 
       const width = canvasWidth * ratio;
@@ -319,109 +549,195 @@ export default function CenterCanvas({
     }
   };
 
-  const getShapeStyle = (type: string, isSelected: boolean) => {
+  const getShapeStyle = (type: string, isSelected: boolean, remoteColor?: string) => {
     const baseClass = "absolute transition-all duration-250 cursor-pointer flex items-center justify-center border-2 shadow-md ";
     const selectedClass = isSelected 
-      ? "border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 shadow-lg scale-102"
-      : "border-indigo-500 hover:border-indigo-650 hover:shadow-lg hover:scale-101";
+      ? "border-indigo-600 dark:border-indigo-400 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 shadow-lg scale-102"
+      : remoteColor
+      ? "shadow-lg scale-101 border-transparent"
+      : "border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 hover:shadow-lg hover:scale-101";
 
     switch (type) {
       case 'terminator':
-        return `${baseClass} ${selectedClass} rounded-full bg-white text-indigo-900`;
+        return `${baseClass} ${selectedClass} rounded-full bg-white dark:bg-slate-800 text-indigo-900 dark:text-indigo-100`;
       case 'process':
-        return `${baseClass} ${selectedClass} rounded-xl bg-white text-indigo-950`;
+        return `${baseClass} ${selectedClass} rounded-xl bg-white dark:bg-slate-800 text-indigo-950 dark:text-indigo-100`;
       case 'decision':
         // A rotated square needs specific sizing and text handling
-        return `${baseClass} ${selectedClass} bg-white text-indigo-950`;
+        return `${baseClass} ${selectedClass} bg-white dark:bg-slate-800 text-indigo-950 dark:text-indigo-100`;
       case 'io':
-        return `${baseClass} ${selectedClass} bg-white text-indigo-950`;
+        return `${baseClass} ${selectedClass} bg-white dark:bg-slate-800 text-indigo-950 dark:text-indigo-100`;
       default:
-        return `${baseClass} ${selectedClass} bg-white text-indigo-950`;
+        return `${baseClass} ${selectedClass} bg-white dark:bg-slate-800 text-indigo-950 dark:text-indigo-100`;
     }
   };
 
   return (
-    <div className="flex-grow h-full flex flex-col min-w-0 bg-[#fbfbfc]">
+    <div className="flex-grow h-full flex flex-col min-w-0 bg-[#fbfbfc] dark:bg-slate-900">
       {/* Top Toolbar */}
-      <header className="h-[64px] bg-white border-b border-gray-100 shadow-xs px-6 flex items-center justify-between shrink-0 select-none z-10">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Workspace</span>
-          <span className="text-gray-300">/</span>
-          <span className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-            Form-Flow Sandbox
-            <span className="px-1.5 py-0.5 bg-indigo-50 text-[10px] text-indigo-600 rounded-md font-semibold font-mono">STABLE</span>
-            {isCollaborative && (
-              <span className="px-1.5 py-0.5 bg-emerald-50 text-[10px] text-emerald-600 rounded-md font-semibold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                COLLABORATIVE
-              </span>
-            )}
-          </span>
+      <header className="h-[64px] bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 shadow-xs px-4 flex items-center justify-between shrink-0 select-none z-10 relative min-w-0 max-w-full overflow-x-auto overflow-y-hidden custom-scrollbar flex-nowrap">
+        <div className="flex items-center gap-2 shrink-0 max-w-[45%] overflow-x-auto custom-scrollbar">
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">Workspace</span>
+          <span className="text-gray-300 dark:text-slate-600">/</span>
+          <select 
+            value={currentWorkspace} 
+            onChange={(e) => onLoad(e.target.value)}
+            className="text-sm font-bold text-gray-800 dark:text-slate-100 bg-transparent border-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-sm max-w-[140px] truncate appearance-none"
+            style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
+          >
+            {workspaces.map(w => <option key={w} value={w} className="dark:bg-slate-800">{w}</option>)}
+          </select>
+          <span className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/40 text-[10px] text-indigo-600 dark:text-indigo-300 rounded-md font-semibold font-mono hidden sm:inline">STABLE</span>
+          <button onClick={() => {
+            let name = prompt('Save workspace as (enter new name):', currentWorkspace + ' Copy');
+            if (name) {
+              name = name.trim();
+              if (name === '') return;
+              if (workspaces.includes(name) && name !== currentWorkspace) {
+                if (!confirm(`Workspace "${name}" already exists. Overwrite?`)) return;
+              }
+              onSave(name);
+            }
+          }} title="Save As" className="text-gray-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer ml-1 p-1">
+             <Save className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => {
+            if(confirm(`Are you sure you want to delete the workspace "${currentWorkspace}"?`)) onDeleteWorkspace(currentWorkspace);
+          }} title="Delete Workspace" className="text-gray-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 cursor-pointer p-1">
+             <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0 flex-nowrap">
+          <button
+            onClick={toggleDarkMode}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            className="px-2 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
+          <button
+            id="toolbar-btn-shortcuts"
+            onClick={onToggleShortcutsHelp}
+            title="Keyboard Shortcuts (Shift + ?)"
+            className="px-2 py-1.5 border border-indigo-200 dark:border-indigo-800 hover:border-indigo-300 dark:hover:border-indigo-700 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <Keyboard className="w-4 h-4" />
+            <span className="hidden md:inline">Shortcuts</span>
+          </button>
+
           <button
             id="toolbar-btn-save"
-            onClick={onSave}
+            onClick={() => onSave(currentWorkspace)}
             title="Save blueprint to Local Storage"
-            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Save className="w-3.5 h-3.5" />
             Save
           </button>
           
+          <label className="px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer">
+            <Upload className="w-3.5 h-3.5" />
+            <span>Import</span>
+            <input type="file" accept=".json" className="hidden" onChange={(e) => {
+               if(e.target.files?.[0]) onImportJSON(e.target.files[0]);
+               e.target.value = '';
+            }} />
+          </label>
+
           <button
-            id="toolbar-btn-load"
-            onClick={onLoad}
-            title="Load blueprint from Local Storage"
-            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            onClick={() => onLayoutDirectionChange(layoutDirection === 'vertical' ? 'horizontal' : 'vertical')}
+            title="Toggle layout direction"
+            className="px-2.5 py-1.5 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <FolderOpen className="w-3.5 h-3.5" />
-            Load
+            {layoutDirection === 'vertical' ? '↕ Vertical' : '↔ Horizontal'}
           </button>
 
           <button
             id="toolbar-btn-new-flowchart"
             onClick={() => setShowConfirmModal(true)}
             title="Start an empty flowchart"
-            className="px-3 py-1.5 border border-red-200 hover:border-red-350 text-red-650 hover:text-red-800 hover:bg-red-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-2.5 py-1.5 border border-red-200 dark:border-red-900 hover:border-red-350 dark:hover:border-red-700 text-red-650 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <FilePlus className="w-3.5 h-3.5 text-red-500" />
-            New Flowchart
+            <FilePlus className="w-3.5 h-3.5 text-red-500 dark:text-red-400" />
+            New
           </button>
 
-          <div className="h-4 w-px bg-gray-200 mx-1"></div>
+          <div className="h-4 w-px bg-gray-200 dark:bg-slate-600 mx-0.5"></div>
 
-          <button
-            id="toolbar-btn-export-png"
-            onClick={handleExportPNG}
-            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <FileImage className="w-3.5 h-3.5" />
-            Export PNG
-          </button>
-
-          <button
-            id="toolbar-btn-export-pdf"
-            onClick={handleExportPDF}
-            className="px-3 py-1.5 border border-gray-200 hover:border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Export PDF
-          </button>
-
-          <button
-            id="toolbar-btn-export-pptx"
-            onClick={handleExportPPTX}
-            title="Export full premium presentation blueprint"
-            className="px-4 py-1.8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-150 hover:scale-[1.02] cursor-pointer"
-          >
-            <Presentation className="w-4 h-4" />
-            <Sparkles className="w-3 h-3 fill-white/20 animate-pulse text-indigo-200" />
-            Export PPTX
-          </button>
+          {/* Unified Sleek Export Dropdown */}
+          <div className="relative">
+            <button
+              ref={exportBtnRef}
+              id="toolbar-btn-export-menu"
+              onClick={toggleExportMenu}
+              aria-expanded={showExportMenu}
+              aria-haspopup="true"
+              aria-controls="export-menu-dropdown"
+              title="Export diagram in various formats"
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-150 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export</span>
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${showExportMenu ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* Portalled Export Dropdown Menu */}
+      {showExportMenu && createPortal(
+        <div
+          ref={exportMenuRef}
+          id="export-menu-dropdown"
+          role="menu"
+          style={{
+            position: 'fixed',
+            top: `${exportMenuPos.top}px`,
+            right: `${exportMenuPos.right}px`,
+          }}
+          className="w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+        >
+          <button
+            role="menuitem"
+            onClick={() => { handleExportPNG(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <FileImage className="w-4 h-4 text-indigo-500" />
+            <span>Export PNG Image</span>
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <FileText className="w-4 h-4 text-rose-500" />
+            <span>Export PDF Document</span>
+          </button>
+          <button
+            role="menuitem"
+            onClick={() => { handleExportPPTX(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Presentation className="w-4 h-4 text-amber-500" />
+            <span className="flex items-center gap-1">
+              Export PPTX
+              <Sparkles className="w-3 h-3 text-amber-500 fill-amber-200 animate-pulse" />
+            </span>
+          </button>
+          <div className="my-1 border-t border-gray-100 dark:border-slate-700"></div>
+          <button
+            role="menuitem"
+            onClick={() => { onExportJSON(); setShowExportMenu(false); }}
+            className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-emerald-500" />
+            <span>Export JSON Blueprint</span>
+          </button>
+        </div>,
+        document.body
+      )}
 
       {/* Grid Canvas area with zoom and pan interaction */}
       <div 
@@ -430,11 +746,13 @@ export default function CenterCanvas({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        className={`flex-grow relative overflow-hidden bg-[#f8f9fa] select-none ${
+        className={`flex-grow relative overflow-hidden bg-[#f8f9fa] dark:bg-slate-900 select-none ${
           isPanning ? 'cursor-grabbing' : 'cursor-grab'
         }`}
         style={{
-          backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
+          backgroundImage: isDarkMode 
+            ? 'radial-gradient(#334155 1.5px, transparent 1.5px)'
+            : 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
           backgroundSize: `${20 * scale}px ${20 * scale}px`,
           backgroundPosition: `${pan.x}px ${pan.y}px`,
         }}
@@ -442,11 +760,11 @@ export default function CenterCanvas({
         {blocks.length === 0 ? (
           // Empty State Component
           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 select-none">
-            <div className="w-20 h-20 rounded-2xl bg-indigo-50 flex items-center justify-center mb-5 animate-bounce shadow-inner">
-              <MousePointer className="w-10 h-10 text-indigo-500" />
+            <div className="w-20 h-20 rounded-2xl bg-indigo-50 dark:bg-slate-800 flex items-center justify-center mb-5 animate-bounce shadow-inner">
+              <MousePointer className="w-10 h-10 text-indigo-500 dark:text-indigo-400" />
             </div>
-            <h3 className="text-base font-bold text-gray-800 tracking-tight text-center">Unleash Your Structured Flow</h3>
-            <p className="text-xs text-gray-400 mt-1 max-w-[280px] text-center leading-relaxed">
+            <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 tracking-tight text-center">Unleash Your Structured Flow</h3>
+            <p className="text-xs text-gray-400 dark:text-slate-400 mt-1 max-w-[280px] text-center leading-relaxed">
               No blocks yet. Add your first block from the left panel.
             </p>
             <button
@@ -463,13 +781,58 @@ export default function CenterCanvas({
             {/* Play flowchart view */}
             <div 
               ref={canvasRef}
-              className="relative origin-top-left"
+              className={`relative origin-top-left ${isDarkMode ? 'dark' : ''}`}
               style={{ 
                 width: `${maxWidth}px`, 
                 height: `${maxHeight}px`,
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
               }}
             >
+              {/* Bounding containers for expanded groups */}
+              {Array.from(expandedGroups.entries()).map(([gId, group]) => {
+                const width = (group.maxX - group.minX) + 48;
+                const height = (group.maxY - group.minY) + 70;
+                const left = group.minX - 24;
+                const top = group.minY - 46;
+
+                return (
+                  <div
+                    key={`group-card-${gId}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${left}px`,
+                      top: `${top}px`,
+                      width: `${width}px`,
+                      height: `${height}px`,
+                      pointerEvents: 'none',
+                    }}
+                    className="border-2 border-dashed border-indigo-200 bg-indigo-50/10 rounded-2xl z-0"
+                  >
+                    <div className="absolute top-2.5 left-4 flex items-center gap-2 pointer-events-auto select-none">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-500 bg-indigo-50/80 px-2 py-0.5 rounded-md">
+                        {group.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          blocks.forEach(b => {
+                            if (b.groupId === gId) {
+                              onUpdateBlock({
+                                ...b,
+                                isGroupCollapsed: true
+                              });
+                            }
+                          });
+                        }}
+                        className="px-1.5 py-0.5 bg-white hover:bg-indigo-50 text-[9px] font-bold text-indigo-600 border border-indigo-150 rounded shadow-xs cursor-pointer transition-colors"
+                      >
+                        Collapse
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
               {/* SVG Vectors connecting elements */}
               <svg className="absolute inset-0 pointer-events-none w-full h-full z-0 overflow-visible">
                 <defs>
@@ -496,6 +859,7 @@ export default function CenterCanvas({
                     <path d="M 0 1.5 L 9 5 L 0 8.5 z" fill="#94a3b8" />
                   </marker>
                 </defs>
+                <g transform={`translate(${offsetX}, ${offsetY})`}>
 
                 {connections.map((c) => {
                   const isUnconnected = !!(c as any).isUnconnected;
@@ -609,11 +973,16 @@ export default function CenterCanvas({
                     </g>
                   );
                 })}
+                </g>
               </svg>
 
               {/* Render absolute divs representing the custom visual nodes */}
               {nodes.map((node) => {
                 const isSelected = selectedBlockId === node.block.id;
+                
+                // Determine remote selection color
+                const remoteUserIds = Object.entries(remoteSelections).filter(([_, id]) => id === node.block.id).map(([userId]) => userId);
+                const remoteColor = remoteUserIds.length > 0 ? userColors[remoteUserIds[0]] : undefined;
                 
                 // Custom structures for specialized Shapes
                 if (node.block.type === 'decision') {
@@ -628,7 +997,7 @@ export default function CenterCanvas({
                         width: `${NODE_WIDTH}px`,
                         height: `${NODE_HEIGHT}px`,
                       }}
-                      className="absolute group cursor-pointer origin-center"
+                      className="absolute group cursor-pointer origin-center text-indigo-950 dark:text-indigo-100"
                     >
                       {/* Diamond visually rotated 45 degrees, sized as a neat background */}
                       <div 
@@ -637,11 +1006,14 @@ export default function CenterCanvas({
                           height: `${DIAMOND_SIZE}px`,
                           left: `${(NODE_WIDTH - DIAMOND_SIZE) / 2}px`,
                           top: `${(NODE_HEIGHT - DIAMOND_SIZE) / 2}px`,
+                          ...(remoteColor && !isSelected ? { borderColor: remoteColor, boxShadow: `0 0 0 4px ${remoteColor}40` } : {})
                         }}
-                        className={`absolute border-2 shadow-md transition-all duration-200 bg-white rotate-45 ${
+                        className={`absolute border-2 shadow-md transition-all duration-200 bg-white dark:bg-slate-800 rotate-45 ${
                           isSelected 
-                            ? 'border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 scale-102' 
-                            : 'border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg'
+                            ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102' 
+                            : remoteColor 
+                              ? 'shadow-lg scale-101 border-transparent'
+                              : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
                         }`}
                       />
                       {/* Text wrapper kept upright at the same coordinates, centered perfectly */}
@@ -654,7 +1026,7 @@ export default function CenterCanvas({
                         }}
                         className="absolute flex items-center justify-center p-2 text-center z-10 pointer-events-none"
                       >
-                        <span className="text-xs font-bold text-indigo-950 line-clamp-3 leading-tight select-none">
+                        <span className="text-xs font-bold line-clamp-3 leading-tight select-none">
                           {node.block.label}
                         </span>
                       </div>
@@ -674,17 +1046,20 @@ export default function CenterCanvas({
                         width: `${NODE_WIDTH}px`,
                         height: `${NODE_HEIGHT}px`,
                       }}
-                      className="absolute group cursor-pointer origin-center"
+                      className="absolute group cursor-pointer origin-center text-indigo-950 dark:text-indigo-100"
                     >
                       {/* Parallelogram Shape */}
                       <div 
-                        className={`absolute inset-0 transition-all duration-250 bg-white border-2 rounded-md shadow-md ${
+                        className={`absolute inset-0 transition-all duration-250 bg-white dark:bg-slate-800 border-2 rounded-md shadow-md ${
                           isSelected 
-                            ? 'border-indigo-600 ring-4 ring-indigo-100 shadow-indigo-150 scale-102' 
-                            : 'border-indigo-500 hover:border-indigo-650 group-hover:scale-101 group-hover:shadow-lg'
+                            ? 'border-indigo-600 ring-4 ring-indigo-100 dark:ring-indigo-900 shadow-indigo-150 dark:shadow-indigo-900/50 scale-102' 
+                            : remoteColor
+                              ? 'shadow-lg scale-101 border-transparent'
+                              : 'border-indigo-500 dark:border-indigo-400 hover:border-indigo-650 dark:hover:border-indigo-300 group-hover:scale-101 group-hover:shadow-lg'
                         }`}
                         style={{
                           transform: 'skewX(-15deg)',
+                          ...(remoteColor && !isSelected ? { borderColor: remoteColor, boxShadow: `0 0 0 4px ${remoteColor}40` } : {})
                         }}
                       />
                       
@@ -692,7 +1067,7 @@ export default function CenterCanvas({
                       <div 
                         className="absolute inset-0 flex items-center justify-center px-4 text-center z-10 pointer-events-none"
                       >
-                        <span className="text-xs font-bold text-indigo-950 line-clamp-2 leading-tight select-none">
+                        <span className="text-xs font-bold line-clamp-2 leading-tight select-none">
                           {node.block.label}
                         </span>
                       </div>
@@ -711,11 +1086,12 @@ export default function CenterCanvas({
                       top: `${node.y}px`,
                       width: `${NODE_WIDTH}px`,
                       height: `${NODE_HEIGHT}px`,
+                      ...(remoteColor && !isSelected ? { borderColor: remoteColor, boxShadow: `0 0 0 4px ${remoteColor}40` } : {})
                     }}
-                    className={getShapeStyle(node.block.type, isSelected)}
+                    className={getShapeStyle(node.block.type, isSelected, remoteColor)}
                   >
                     <div className="px-4 text-center">
-                      <span className="text-xs font-bold text-indigo-950 line-clamp-2 leading-tight">
+                      <span className="text-xs font-bold line-clamp-2 leading-tight">
                         {node.block.label}
                       </span>
                     </div>
@@ -724,24 +1100,53 @@ export default function CenterCanvas({
               })}
             </div>
 
+            {/* Render Remote Cursors */}
+            {Object.entries(remoteCursors).map(([userId, pos]) => {
+              const color = userColors[userId] || '#6366f1';
+              return (
+                <div
+                  key={userId}
+                  className="absolute pointer-events-none z-50 transition-all duration-75"
+                  style={{
+                    left: 0,
+                    top: 0,
+                    transform: `translate(${pan.x + pos.x * scale}px, ${pan.y + pos.y * scale}px)`,
+                  }}
+                >
+                  <MousePointer 
+                    className="w-5 h-5 drop-shadow-md" 
+                    fill={color}
+                    color="white" 
+                    strokeWidth={1.5} 
+                  />
+                  <div
+                    className="absolute top-5 left-3 px-2 py-0.5 rounded-md text-[10px] font-bold text-white shadow-sm whitespace-nowrap"
+                    style={{ backgroundColor: color }}
+                  >
+                    Guest {userId.substring(0, 4)}
+                  </div>
+                </div>
+              );
+            })}
+
             {/* Float Zoom and Pan Control HUD Panel */}
-            <div className="zoom-controls absolute bottom-6 right-6 flex items-center gap-2 bg-white px-3 py-2 rounded-xl shadow-lg border border-gray-150 z-20 select-none">
+            <div className="zoom-controls absolute bottom-6 right-6 flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-xl shadow-lg border border-gray-150 z-20 select-none">
               <button
                 onClick={() => setScale(prev => Math.max(0.25, parseFloat((prev - 0.1).toFixed(2))))}
                 disabled={scale <= 0.25}
                 title="Zoom Out"
-                className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 hover:border-gray-350 text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 dark:border-gray-700 hover:border-gray-350 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
                 <ZoomOut className="w-4 h-4" />
               </button>
-              <span className="text-xs font-mono font-bold text-gray-600 min-w-[48px] text-center">
+              <span className="text-xs font-mono font-bold text-gray-600 dark:text-gray-400 min-w-[48px] text-center">
                 {Math.round(scale * 100)}%
               </span>
               <button
                 onClick={() => setScale(prev => Math.min(3, parseFloat((prev + 0.1).toFixed(2))))}
                 disabled={scale >= 3}
                 title="Zoom In"
-                className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 hover:border-gray-350 text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                className="w-8 h-8 rounded-lg flex items-center justify-center border border-gray-200 dark:border-gray-700 hover:border-gray-350 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
                 <ZoomIn className="w-4 h-4" />
               </button>
@@ -764,16 +1169,16 @@ export default function CenterCanvas({
       {/* Confirmation Dialog Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 max-w-sm w-full mx-4 transform transition-all scale-100">
-            <h3 className="text-sm font-bold text-gray-900 mb-2">New Flowchart Confirmation</h3>
-            <p className="text-xs text-gray-500 leading-relaxed mb-6">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 p-6 max-w-sm w-full mx-4 transform transition-all scale-100">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">New Flowchart Confirmation</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-6">
               Start a new flowchart? Current work will be lost.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
                 id="btn-confirm-cancel"
                 onClick={() => setShowConfirmModal(false)}
-                className="px-3.5 py-2 border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-xs font-semibold text-gray-600 hover:text-gray-900 rounded-lg transition-all cursor-pointer"
+                className="px-3.5 py-2 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-lg transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -788,6 +1193,70 @@ export default function CenterCanvas({
                 className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-sm shadow-red-100 hover:scale-[1.02] active:scale-98 transition-all cursor-pointer"
               >
                 Start New
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      {showShortcutsHelp && (
+        <div
+          ref={modalRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shortcuts-modal-title"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in"
+        >
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 max-w-md w-full p-6 transform transition-all scale-100">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-slate-700">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                  <Keyboard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 id="shortcuts-modal-title" className="text-sm font-bold text-gray-900 dark:text-slate-100">
+                    Keyboard Shortcuts
+                  </h3>
+                  <p className="text-[11px] text-gray-400 dark:text-slate-400">Power-user efficiency cheatsheet</p>
+                </div>
+              </div>
+              <button
+                ref={modalCloseBtnRef}
+                onClick={onToggleShortcutsHelp}
+                aria-label="Close keyboard shortcuts"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-2.5 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              {[
+                { key: 'Delete / Backspace', desc: 'Delete selected block' },
+                { key: 'Ctrl + A / Cmd + A', desc: 'Select top / root block' },
+                { key: 'Ctrl + D / Cmd + D', desc: 'Duplicate selected block' },
+                { key: 'Ctrl + S / Cmd + S', desc: 'Save workspace state' },
+                { key: 'Escape', desc: 'Deselect block & clear focus' },
+                { key: 'Tab / Shift + Tab', desc: 'Cycle selection forward / backward' },
+                { key: 'Arrow Keys', desc: 'Navigate connected diagram paths' },
+                { key: 'Shift + ?', desc: 'Toggle shortcuts help dialog' },
+              ].map((s) => (
+                <div key={s.key} className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-gray-100 dark:border-slate-700/60">
+                  <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">{s.desc}</span>
+                  <kbd className="px-2 py-1 bg-white dark:bg-slate-800 text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-300 border border-gray-200 dark:border-slate-600 rounded-md shadow-xs">
+                    {s.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 dark:border-slate-700 text-center">
+              <button
+                onClick={onToggleShortcutsHelp}
+                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+              >
+                Got it
               </button>
             </div>
           </div>
