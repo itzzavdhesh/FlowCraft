@@ -164,9 +164,6 @@ export default function CenterCanvas({
     };
   }, []);
 
-  const minWidth = 1200;
-  const minHeight = 800;
-
   // Determine bounds of the layout to ensure the canvas scroll area fits all nodes comfortably
   // Set minimum height and width larger than standard viewports to guarantee spacious scroll bounds
   const minWidth = 1200;
