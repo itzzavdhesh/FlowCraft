@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import LeftSidebar from './components/LeftSidebar';
 import CenterCanvas from './components/CenterCanvas';
 import RightSidebar from './components/RightSidebar';
@@ -90,6 +90,60 @@ export default function App() {
   const [currentWorkspace, setCurrentWorkspace] = useState<string>('Form-Flow Sandbox');
   const [workspaces, setWorkspaces] = useState<string[]>(['Form-Flow Sandbox']);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  // Guard: prevent auto-save from running before initial hydration from localStorage
+  const hasHydrated = useRef(false);
+
+  // Auto-save
+  useEffect(() => {
+    if (!hasHydrated.current) return; // skip the initial mount — hydration hasn't run yet
+    if (currentWorkspace && workspaces.includes(currentWorkspace)) {
+      try {
+        const data = localStorage.getItem('flowforge_workspaces');
+        const parsed = data ? JSON.parse(data) : {};
+        parsed[currentWorkspace] = blocks;
+        localStorage.setItem('flowforge_workspaces', JSON.stringify(parsed));
+      } catch {
+        showToast('Auto-save failed: localStorage may be full or blocked. Your changes are not persisted.', 'error');
+      }
+    }
+  }, [blocks, currentWorkspace, workspaces]);
+
+  // Undo/Redo state
+  const [past, setPast] = useState<Block[][]>([]);
+  const [future, setFuture] = useState<Block[][]>([]);
+
+  const pushState = (newBlocks: Block[]) => {
+    setPast((p) => [...p, blocks]);
+    setFuture([]);
+    setBlocks(newBlocks);
+  };
+
+  const undo = () => {
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    const newPast = past.slice(0, past.length - 1);
+    setPast(newPast);
+    setFuture([blocks, ...future]);
+    setBlocks(previous);
+    // Clear activeParentId if the block it references was removed by this undo
+    if (activeParentId && !previous.some((b) => b.id === activeParentId)) {
+      setActiveParentId(null);
+    }
+  };
+
+  const redo = () => {
+    if (future.length === 0) return;
+    const next = future[0];
+    const newFuture = future.slice(1);
+    setFuture(newFuture);
+    setPast([...past, blocks]);
+    setBlocks(next);
+    // Clear activeParentId if the block it references no longer exists after redo
+    if (activeParentId && !next.some((b) => b.id === activeParentId)) {
+      setActiveParentId(null);
+    }
+  };
+
 
   useEffect(() => {
     try {
@@ -122,6 +176,8 @@ export default function App() {
         }
       }
     } catch {}
+    // Signal that initial hydration is complete — auto-save may now run safely
+    hasHydrated.current = true;
   }, []);
 
   // Dark mode state
@@ -162,7 +218,7 @@ export default function App() {
   // Function to push a toast
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     const newToast: ToastConfig = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: crypto.randomUUID(),
       message,
       type,
     };
@@ -175,11 +231,10 @@ export default function App() {
 
   // Add block from form (Left panel)
   const handleAddBlock = (blockData: Omit<Block, 'id'>) => {
-    const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
+    const newId = `block-${crypto.randomUUID()}`;
 
-    setBlocks((prev) => {
-      let updated = [...prev];
-      let insertedTargetId: string | undefined = undefined;
+    let updated = [...blocks];
+    let insertedTargetId: string | undefined = undefined;
 
       if (activeParentId) {
         const activeIdx = updated.findIndex((b) => b.id === activeParentId);
@@ -209,8 +264,7 @@ export default function App() {
         targetId: insertedTargetId,
       };
 
-      return [...updated, newBlock];
-    });
+      pushState([...updated, newBlock]);
 
     // Automatically set the new block as the active parent for sequential additions
     setActiveParentId(newId);
@@ -222,7 +276,7 @@ export default function App() {
 
   // Update node details (Right panel)
   const handleUpdateBlock = (updatedBlock: Block) => {
-    setBlocks((prev) => prev.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
+    pushState(blocks.map((b) => (b.id === updatedBlock.id ? updatedBlock : b)));
   };
 
   // Delete block
@@ -230,19 +284,19 @@ export default function App() {
     const block = blocks.find((b) => b.id === id);
     if (!block) return;
 
-    setBlocks((prev) => {
-      // Filter out deleted block
-      let updated = prev.filter((b) => b.id !== id);
+    // Filter out deleted block
+    let updated = blocks.filter((b) => b.id !== id);
 
-      // Clean up references to this deleted block from other blocks
-      return updated.map((b) => {
-        const next = { ...b };
-        if (next.targetId === id) next.targetId = '';
-        if (next.yesTargetId === id) next.yesTargetId = '';
-        if (next.noTargetId === id) next.noTargetId = '';
-        return next;
-      });
+    // Clean up references to this deleted block from other blocks
+    const finalBlocks = updated.map((b) => {
+      const next = { ...b };
+      if (next.targetId === id) next.targetId = '';
+      if (next.yesTargetId === id) next.yesTargetId = '';
+      if (next.noTargetId === id) next.noTargetId = '';
+      return next;
     });
+
+    pushState(finalBlocks);
 
     if (selectedBlockId === id) {
       setSelectedBlockId(null);
@@ -258,32 +312,27 @@ export default function App() {
     const targetBlock = blocks.find((b) => b.id === id);
     if (!targetBlock) return;
 
-    const newId = `block-${Math.random().toString(36).substring(2, 9)}`;
-    const canAcceptChild =
-      targetBlock.type !== 'decision' ||
-      !targetBlock.yesTargetId ||
-      !targetBlock.noTargetId;
+    const newId = `block-${crypto.randomUUID()}`;
+    const duplicatedBlock: Block = {
+      ...original,
+      id: newId,
+      label: `${original.label} (Copy)`,
+    };
 
-    setBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === id);
-      if (idx === -1) return prev;
+    const idx = blocks.findIndex((b) => b.id === id);
+    if (idx === -1) {
+      pushState([...blocks, duplicatedBlock]);
+      return;
+    }
 
-      const currentOriginal = prev[idx];
-      const duplicatedBlock: Block = {
-        ...currentOriginal,
-        id: newId,
-        label: `${currentOriginal.label} (Copy)`,
-      };
+    const updated = [...blocks];
+    if (original.type !== 'decision') {
+      duplicatedBlock.targetId = original.targetId;
+      updated[idx] = { ...original, targetId: newId };
+    }
 
-      const updated = [...prev];
-      if (currentOriginal.type !== 'decision') {
-        duplicatedBlock.targetId = currentOriginal.targetId;
-        updated[idx] = { ...currentOriginal, targetId: newId };
-      }
-
-      updated.splice(idx + 1, 0, duplicatedBlock);
-      return updated;
-    });
+    updated.splice(idx + 1, 0, duplicatedBlock);
+    pushState(updated);
 
     setSelectedBlockId(newId);
     if (canAcceptChild) {
@@ -337,6 +386,8 @@ export default function App() {
     onDuplicateBlock: handleDuplicateBlock,
     onSaveWorkspace: handleSaveWorkspace,
     onToggleShortcutsHelp: () => setShowShortcutsHelp((prev) => !prev),
+    onUndo: undo,
+    onRedo: redo,
   });
 
   const handleLoadWorkspace = (name: string) => {
@@ -350,6 +401,8 @@ export default function App() {
             return;
           }
           setBlocks(parsed[name]);
+          setPast([]);
+          setFuture([]);
           setCurrentWorkspace(name);
           setSelectedBlockId(null);
           setActiveParentId(null);
@@ -426,7 +479,7 @@ export default function App() {
             const currentKeys = Object.keys(parsedStorage);
             
             while (currentKeys.includes(newName) || isInvalidWorkspaceName(newName)) {
-                newName = `${baseName}-${Math.random().toString(36).substring(2, 6)}`;
+                newName = `${baseName}-${crypto.randomUUID().slice(0, 4)}`;
             }
             
             try {
@@ -435,6 +488,8 @@ export default function App() {
                 
                 // Only update React state after successfully persisting to localStorage
                 setBlocks(parsed);
+                setPast([]);
+                setFuture([]);
                 setSelectedBlockId(null);
                 setActiveParentId(null);
                 setWorkspaces([...currentKeys, newName]);
@@ -485,7 +540,7 @@ export default function App() {
   };
 
   const handleNewFlowchart = () => {
-    setBlocks([]);
+    pushState([]);
     setSelectedBlockId(null);
     setActiveParentId(null);
     showToast('Flowchart cleared. Canvas is ready!', 'info');
@@ -521,7 +576,7 @@ export default function App() {
         workspaces={workspaces}
         currentWorkspace={currentWorkspace}
         onAddFirstBlock={() => {
-          setBlocks(initialDemoBlocks);
+          pushState(initialDemoBlocks);
           setSelectedBlockId('demo-1');
           showToast('Loaded vertical flow template!');
         }}

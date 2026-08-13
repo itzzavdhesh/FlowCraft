@@ -17,6 +17,8 @@ interface UseKeyboardShortcutsProps {
   onDuplicateBlock: (id: string) => void;
   onSaveWorkspace: (name: string) => void;
   onToggleShortcutsHelp: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 export function useKeyboardShortcuts({
@@ -29,6 +31,8 @@ export function useKeyboardShortcuts({
   onDuplicateBlock,
   onSaveWorkspace,
   onToggleShortcutsHelp,
+  onUndo,
+  onRedo,
 }: UseKeyboardShortcutsProps) {
   useEffect(() => {
     const isInteractiveElement = (target: HTMLElement | null): boolean => {
@@ -81,8 +85,23 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      // If user is focused on an interactive control (input, button, link, etc.), skip canvas shortcuts
-      if (isInteractiveElement(target)) return;
+      // If user is currently typing in a form input, skip global shortcuts
+      // (allows Ctrl+Z / Ctrl+Y to use browser-native text field undo/redo)
+      if (isInput) return;
+
+      // Undo shortcut: Ctrl + Z / Cmd + Z
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        onUndo();
+        return;
+      }
+
+      // Redo shortcut: Ctrl + Y / Cmd + Y OR Ctrl + Shift + Z
+      if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        onRedo();
+        return;
+      }
 
       // Select All / Focus Root: Ctrl + A / Cmd + A
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
@@ -208,5 +227,7 @@ export function useKeyboardShortcuts({
     onDuplicateBlock,
     onSaveWorkspace,
     onToggleShortcutsHelp,
+    onUndo,
+    onRedo,
   ]);
 }
