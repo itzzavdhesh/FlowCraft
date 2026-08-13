@@ -124,14 +124,11 @@ export default function RightSidebar({
       <div className="flex-grow p-5 space-y-4 overflow-y-auto custom-scrollbar">
         {/* Warning Indicator for Missing Decision connections */}
         {selectedBlock.type === 'decision' && (
-          !selectedBlock.yesTargetId || 
-          selectedBlock.yesTargetId === selectedBlock.id || 
-          !selectedBlock.noTargetId || 
-          selectedBlock.noTargetId === selectedBlock.id
+          branches.some(br => !br.targetId || br.targetId === selectedBlock.id)
         ) && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[11px] font-semibold tracking-wide flex items-start gap-1.5 leading-normal">
             <span className="text-amber-600 shrink-0 select-none">⚠</span>
-            <span>Set Yes and No branch targets</span>
+            <span>Set all branch targets</span>
           </div>
         )}
 

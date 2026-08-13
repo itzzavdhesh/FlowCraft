@@ -6,6 +6,12 @@
 export type ShapeType = 'terminator' | 'process' | 'decision' | 'io';
 export type LayoutDirection = 'vertical' | 'horizontal';
 
+export interface Branch {
+  id: string;
+  label: string;
+  targetId?: string;
+}
+
 export interface Block {
   id: string;
   type: ShapeType;

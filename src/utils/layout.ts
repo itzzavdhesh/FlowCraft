@@ -261,21 +261,40 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
       const parentBlock = processedBlocks.find(b => b.id === pId);
       
       if (parentBlock?.type === 'decision') {
-        if (parentBlock.yesTargetId === id) {
-          // YES BRANCH: Placed to the BOTTOM-RIGHT of the diamond
-          // Same X position as center + 200px (right column), Y below diamond (+150px)
-          row = parentCoord.row + 1;
-          col = parentCoord.col + 1;
-          while (occupied.has(`${row},${col}`)) {
-            row++;
+        if (parentBlock.branches && parentBlock.branches.length > 0) {
+          const brIdx = parentBlock.branches.findIndex(br => br.targetId === id);
+          if (brIdx !== -1) {
+            const numBranches = parentBlock.branches.length;
+            let offset = 0;
+            if (numBranches > 1) {
+              const fraction = brIdx / (numBranches - 1);
+              offset = Math.round((fraction - 0.5) * numBranches * 1.5);
+            }
+            row = parentCoord.row + 1;
+            col = parentCoord.col + offset;
+            while (occupied.has(`${row},${col}`)) {
+              row++;
+            }
+          } else {
+            row = parentCoord.row + 1;
+            col = parentCoord.col;
+            while (occupied.has(`${row},${col}`)) {
+              row++;
+            }
           }
         } else {
-          // NO BRANCH: Placed to the BOTTOM-LEFT of the diamond
-          // Same X position as center - 200px (left column), Y below diamond (+150px)
-          row = parentCoord.row + 1;
-          col = parentCoord.col - 1;
-          while (occupied.has(`${row},${col}`)) {
-            row++;
+          if (parentBlock.yesTargetId === id) {
+            row = parentCoord.row + 1;
+            col = parentCoord.col + 1;
+            while (occupied.has(`${row},${col}`)) {
+              row++;
+            }
+          } else {
+            row = parentCoord.row + 1;
+            col = parentCoord.col - 1;
+            while (occupied.has(`${row},${col}`)) {
+              row++;
+            }
           }
         }
       } else {
@@ -388,7 +407,7 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
         if (target) {
           lines.push(generateConnection(source, target, block.yesLabel || 'Yes', 'yes', sharedTargets.has(target.block.id), layoutDirection, layoutBounds, backwardLanes));
         } else {
-          // If the target is set but somehow not in the nodes, treat as unconnected
+          // Unconnected or pointing to self
           const startX = sourceCx + DIAMOND_HALF_DIAG;
           const startY = sourceCy;
           const endX = startX + 60;
@@ -406,25 +425,6 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
             endY,
           });
         }
-      } else {
-        // Unconnected or pointing to self
-        const startX = sourceCx + DIAMOND_HALF_DIAG;
-        const startY = sourceCy;
-        const endX = startX + 60;
-        const endY = startY;
-        lines.push({
-          id: `${source.block.id}-unconnected-yes`,
-          sourceId: source.block.id,
-          path: `M ${startX} ${startY} L ${endX} ${endY}`,
-          label: block.yesLabel || 'Yes',
-          labelX: startX + 25,
-          labelY: startY - 14,
-          isUnconnected: true,
-          unconnectedDir: 'right',
-          endX,
-          endY,
-        });
-      }
 
       // NO BRANCH
       if (block.noTargetId) {
@@ -432,7 +432,7 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
         if (target) {
           lines.push(generateConnection(source, target, block.noLabel || 'No', 'no', sharedTargets.has(target.block.id), layoutDirection, layoutBounds, backwardLanes));
         } else {
-          // If the target is set but somehow not in the nodes, treat as unconnected
+          // Unconnected or pointing to self
           const startX = sourceCx - DIAMOND_HALF_DIAG;
           const startY = sourceCy;
           const endX = startX - 60;
@@ -450,24 +450,6 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
             endY,
           });
         }
-      } else {
-        // Unconnected or pointing to self
-        const startX = sourceCx - DIAMOND_HALF_DIAG;
-        const startY = sourceCy;
-        const endX = startX - 60;
-        const endY = startY;
-        lines.push({
-          id: `${source.block.id}-unconnected-no`,
-          sourceId: source.block.id,
-          path: `M ${startX} ${startY} L ${endX} ${endY}`,
-          label: block.noLabel || 'No',
-          labelX: startX - 25,
-          labelY: startY - 14,
-          isUnconnected: true,
-          unconnectedDir: 'right',
-          endX,
-          endY,
-        });
       }
     } else {
       // Standard Connection (Terminator, Process, IO)
@@ -481,6 +463,52 @@ export function calculateConnections(nodes: CanvasNode[], layoutDirection: Layou
   });
 
   return lines;
+}
+
+function generateUnconnectedBranch(
+  source: CanvasNode,
+  idx: number,
+  total: number,
+  label: string
+): SvgLine {
+  const sourceCx = source.x + NODE_WIDTH / 2;
+  const sourceCy = source.y + NODE_HEIGHT / 2;
+
+  let dir: 'left' | 'right' | 'down' = 'down';
+  let startX = sourceCx;
+  let startY = source.y + NODE_HEIGHT;
+
+  if (total === 2) {
+    dir = idx === 0 ? 'left' : 'right';
+  } else if (total >= 3) {
+    if (idx === 0) dir = 'left';
+    else if (idx === total - 1) dir = 'right';
+    else dir = 'down';
+  }
+
+  if (dir === 'left') {
+    startX = sourceCx - DIAMOND_HALF_DIAG;
+    startY = sourceCy;
+  } else if (dir === 'right') {
+    startX = sourceCx + DIAMOND_HALF_DIAG;
+    startY = sourceCy;
+  }
+
+  const endX = dir === 'left' ? startX - 60 : (dir === 'right' ? startX + 60 : startX);
+  const endY = dir === 'down' ? startY + 60 : startY;
+
+  return {
+    id: `${source.block.id}-unconnected-branch-${idx}`,
+    sourceId: source.block.id,
+    path: `M ${startX} ${startY} L ${endX} ${endY}`,
+    label: label,
+    labelX: dir === 'left' ? startX - 25 : (dir === 'right' ? startX + 25 : startX + 15),
+    labelY: dir === 'down' ? startY + 30 : startY - 14,
+    isUnconnected: true,
+    unconnectedDir: dir === 'down' ? 'down' : 'right',
+    endX,
+    endY,
+  };
 }
 
 function generateConnection(
