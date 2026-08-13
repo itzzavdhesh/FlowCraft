@@ -992,11 +992,15 @@ export default function CenterCanvas({
                       key={node.block.id}
                       id={`flow-node-${node.block.id}`}
                       onClick={() => onSelectBlock(node.block.id)}
+                      onPointerDown={(e) => handleNodePointerDown(e, node)}
+                      onPointerMove={(e) => handleNodePointerMove(e, node.block.id)}
+                      onPointerUp={handleNodePointerUp}
                       style={{
                         left: `${node.x}px`,
                         top: `${node.y}px`,
                         width: `${NODE_WIDTH}px`,
                         height: `${NODE_HEIGHT}px`,
+                        touchAction: 'none',
                       }}
                       className="absolute group cursor-pointer origin-center text-indigo-950 dark:text-indigo-100"
                     >
@@ -1034,18 +1038,22 @@ export default function CenterCanvas({
                     </div>
                   );
                 }
-
+ 
                 if (node.block.type === 'io') {
                   return (
                     <div
                       key={node.block.id}
                       id={`flow-node-${node.block.id}`}
                       onClick={() => onSelectBlock(node.block.id)}
+                      onPointerDown={(e) => handleNodePointerDown(e, node)}
+                      onPointerMove={(e) => handleNodePointerMove(e, node.block.id)}
+                      onPointerUp={handleNodePointerUp}
                       style={{
                         left: `${node.x}px`,
                         top: `${node.y}px`,
                         width: `${NODE_WIDTH}px`,
                         height: `${NODE_HEIGHT}px`,
+                        touchAction: 'none',
                       }}
                       className="absolute group cursor-pointer origin-center text-indigo-950 dark:text-indigo-100"
                     >
@@ -1075,13 +1083,16 @@ export default function CenterCanvas({
                     </div>
                   );
                 }
-
+ 
                 // Standard Process or Terminator shapes
                 return (
                   <div
                     key={node.block.id}
                     id={`flow-node-${node.block.id}`}
                     onClick={() => onSelectBlock(node.block.id)}
+                    onPointerDown={(e) => handleNodePointerDown(e, node)}
+                    onPointerMove={(e) => handleNodePointerMove(e, node.block.id)}
+                    onPointerUp={handleNodePointerUp}
                     style={{
                       left: `${node.x}px`,
                       top: `${node.y}px`,

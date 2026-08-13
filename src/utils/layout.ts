@@ -335,12 +335,14 @@ export function calculateLayout(blocks: Block[], layoutDirection: LayoutDirectio
   return processedBlocks.map((block) => {
     const { row, col } = layoutMap.get(block.id) || { row: 0, col: 0 };
     // col = 0 is centered, col = 1 is shifted right, etc.
-    const x = 600 + col * COLUMN_WIDTH;
-    const y = 40 + row * ROW_HEIGHT;
+    const baseX = 600 + col * COLUMN_WIDTH;
+    const baseY = 40 + row * ROW_HEIGHT;
+    const offsetX = block.positionOffset ? block.positionOffset.x : 0;
+    const offsetY = block.positionOffset ? block.positionOffset.y : 0;
     return {
       block,
-      x,
-      y,
+      x: baseX + offsetX,
+      y: baseY + offsetY,
       row,
       col,
     };
