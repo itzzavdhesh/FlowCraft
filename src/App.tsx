@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import LeftSidebar from './components/LeftSidebar';
 import CenterCanvas from './components/CenterCanvas';
 import RightSidebar from './components/RightSidebar';
@@ -90,6 +90,23 @@ export default function App() {
   const [currentWorkspace, setCurrentWorkspace] = useState<string>('Form-Flow Sandbox');
   const [workspaces, setWorkspaces] = useState<string[]>(['Form-Flow Sandbox']);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  // Guard: prevent auto-save from running before initial hydration from localStorage
+  const hasHydrated = useRef(false);
+
+  // Auto-save
+  useEffect(() => {
+    if (!hasHydrated.current) return; // skip the initial mount — hydration hasn't run yet
+    if (currentWorkspace && workspaces.includes(currentWorkspace)) {
+      try {
+        const data = localStorage.getItem('flowforge_workspaces');
+        const parsed = data ? JSON.parse(data) : {};
+        parsed[currentWorkspace] = blocks;
+        localStorage.setItem('flowforge_workspaces', JSON.stringify(parsed));
+      } catch {
+        showToast('Auto-save failed: localStorage may be full or blocked. Your changes are not persisted.', 'error');
+      }
+    }
+  }, [blocks, currentWorkspace, workspaces]);
 
   // Undo/Redo state
   const [past, setPast] = useState<Block[][]>([]);
@@ -159,6 +176,8 @@ export default function App() {
         }
       }
     } catch {}
+    // Signal that initial hydration is complete — auto-save may now run safely
+    hasHydrated.current = true;
   }, []);
 
   // Dark mode state
